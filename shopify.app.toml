@@ -9,7 +9,8 @@ scopes = "read_products,write_products,read_orders,write_orders,read_customers,w
 
 [auth]
 redirect_urls = [
-  "https://fbai-app.trustclouds.in/auth/shopify/callback"
+  "https://fbai-app.trustclouds.in/auth/shopify/callback",
+  "https://fbai-app.trustclouds.in/auth/callback"
 ]
 
 [webhooks]

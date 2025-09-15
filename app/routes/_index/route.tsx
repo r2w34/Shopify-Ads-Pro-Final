@@ -9,11 +9,14 @@ import styles from "./styles.module.css";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
+  // For embedded apps, if shop parameter is present, redirect to app
   if (url.searchParams.get("shop")) {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  // For embedded apps, we don't show the manual form
+  // The app should be installed through Shopify's app installation flow
+  return { showForm: false };
 };
 
 export default function App() {
@@ -33,68 +36,7 @@ export default function App() {
           </p>
         </div>
 
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input 
-                id="shop-input"
-                className={styles.input} 
-                type="text" 
-                name="shop" 
-                placeholder="your-store.myshopify.com" 
-              />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              🚀 Install FB AI Ads Pro
-            </button>
-          </Form>
-        )}
-        
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            // Auto-detect shop from URL parameters or referrer
-            (function() {
-              const urlParams = new URLSearchParams(window.location.search);
-              const shopParam = urlParams.get('shop');
-              
-              if (shopParam) {
-                const shopInput = document.getElementById('shop-input');
-                if (shopInput) {
-                  shopInput.value = shopParam;
-                }
-                return;
-              }
-              
-              // Try to detect from referrer
-              if (document.referrer) {
-                const referrerUrl = new URL(document.referrer);
-                if (referrerUrl.hostname.includes('myshopify.com')) {
-                  const shopInput = document.getElementById('shop-input');
-                  if (shopInput) {
-                    shopInput.value = referrerUrl.hostname;
-                  }
-                }
-              }
-              
-              // Try to detect from embedded context
-              if (window.parent !== window) {
-                try {
-                  const parentUrl = window.parent.location.hostname;
-                  if (parentUrl.includes('myshopify.com')) {
-                    const shopInput = document.getElementById('shop-input');
-                    if (shopInput) {
-                      shopInput.value = parentUrl;
-                    }
-                  }
-                } catch (e) {
-                  // Cross-origin restriction, ignore
-                }
-              }
-            })();
-          `
-        }} />
+
 
         <div className={styles.features}>
           <h2 className={styles.featuresTitle}>🎯 Powerful AI Features</h2>
@@ -151,11 +93,7 @@ export default function App() {
         <div className={styles.cta}>
           <h2>Ready to Transform Your Facebook Advertising?</h2>
           <p>Join thousands of Shopify merchants who trust FB AI Ads Pro to grow their business.</p>
-          {showForm && (
-            <button className={styles.ctaButton} onClick={() => document.querySelector('input[name="shop"]')?.focus()}>
-              🚀 Get Started Now - Free Trial
-            </button>
-          )}
+          <p><strong>Install this app from your Shopify Admin → Apps → App Store</strong></p>
         </div>
       </div>
     </div>

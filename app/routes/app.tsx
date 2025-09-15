@@ -11,21 +11,12 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    await authenticate.admin(request);
-    return json({
-      apiKey: process.env.SHOPIFY_API_KEY || "",
-    });
-  } catch (error) {
-    console.error('App route authentication error:', error);
-    // Instead of throwing, return a response that will trigger re-authentication
-    throw new Response('Authentication required', {
-      status: 302,
-      headers: {
-        Location: '/auth/login'
-      }
-    });
-  }
+  const { admin } = await authenticate.admin(request);
+  
+  return json({
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    shop: admin.rest.session.shop,
+  });
 };
 
 export default function App() {
