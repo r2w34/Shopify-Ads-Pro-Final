@@ -128,12 +128,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       // Store Facebook account in database
       const facebookAccount = await db.facebookAccount.upsert({
-        where: { shop },
+        where: { 
+          shop_facebookUserId: {
+            shop: shop,
+            facebookUserId: userData.id
+          }
+        },
         update: {
-          facebookUserId: userData.id,
           accessToken: accessToken,
-          email: userData.email,
-          name: userData.name,
           isActive: true,
           updatedAt: new Date()
         },
@@ -141,8 +143,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           shop,
           facebookUserId: userData.id,
           accessToken: accessToken,
-          email: userData.email,
-          name: userData.name,
           isActive: true
         }
       });
