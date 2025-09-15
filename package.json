@@ -41,7 +41,7 @@
     "axios": "^1.12.1",
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.4.5",
-    "facebook-nodejs-business-sdk": "^20.0.3",
+    "facebook-nodejs-business-sdk": "^23.0.1",
     "isbot": "^5.1.0",
     "openai": "^4.104.0",
     "prisma": "^6.2.1",
