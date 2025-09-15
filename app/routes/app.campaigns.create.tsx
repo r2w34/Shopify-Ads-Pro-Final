@@ -35,6 +35,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
+  // Debug logging
+  console.log("🔍 Campaign Create - Shop from session:", shop);
+
   // Check Facebook connection and get ad accounts, pages, and Instagram accounts
   const facebookAccount = await db.facebookAccount.findFirst({
     where: { shop, isActive: true },
@@ -48,7 +51,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
 
+  console.log("🔍 Campaign Create - Facebook account found:", !!facebookAccount);
+  if (facebookAccount) {
+    console.log("🔍 Campaign Create - Ad accounts count:", facebookAccount.adAccounts.length);
+    console.log("🔍 Campaign Create - Pages count:", facebookAccount.pages.length);
+  }
+
   if (!facebookAccount) {
+    console.log("❌ Campaign Create - No Facebook account found, redirecting to facebook-settings");
     return redirect("/app/facebook-settings?error=not_connected");
   }
 
