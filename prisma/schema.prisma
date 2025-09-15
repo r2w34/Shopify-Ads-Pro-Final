@@ -343,6 +343,7 @@ model AdminUser {
   updatedAt         DateTime  @updatedAt
   
   auditLogs         AuditLog[]
+  assignedTickets   SupportTicket[]
 }
 
 model AuditLog {
@@ -360,4 +361,60 @@ model AuditLog {
   userAgent         String?
   
   createdAt         DateTime  @default(now())
+}
+
+model SupportTicket {
+  id                String    @id @default(cuid())
+  ticketNumber      String    @unique
+  shop              String
+  
+  // Ticket details
+  subject           String
+  description       String
+  category          String    // "technical", "billing", "feature_request", "bug_report", "general"
+  priority          String    @default("medium") // "low", "medium", "high", "urgent"
+  status            String    @default("open") // "open", "in_progress", "waiting_customer", "resolved", "closed"
+  
+  // Customer info
+  customerEmail     String?
+  customerName      String?
+  
+  // Assignment
+  assignedToId      String?
+  assignedTo        AdminUser? @relation(fields: [assignedToId], references: [id])
+  
+  // Metadata
+  tags              String?   // JSON array of tags
+  attachments       String?   // JSON array of attachment URLs
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  
+  // Relations
+  messages          SupportMessage[]
+}
+
+model SupportMessage {
+  id                String    @id @default(cuid())
+  ticketId          String
+  ticket            SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  // Message details
+  message           String
+  isFromCustomer    Boolean   @default(true)
+  
+  // Author info
+  authorId          String?   // AdminUser ID if from admin
+  authorName        String?   // Customer name if from customer
+  authorEmail       String?   // Customer email if from customer
+  
+  // Metadata
+  attachments       String?   // JSON array of attachment URLs
+  isInternal        Boolean   @default(false) // Internal notes not visible to customer
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

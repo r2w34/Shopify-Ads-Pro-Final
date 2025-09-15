@@ -20,44 +20,44 @@ import {
   TextContainer,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
+import { db } from "../db.server";
+import { EmailService } from "../services/email.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   
-  // Mock support tickets data - in real app, fetch from database
-  const supportTickets = [
-    {
-      id: "TICK-001",
-      subject: "Facebook Ads Not Creating",
-      status: "open",
-      priority: "high",
-      created: "2024-09-15",
-      lastUpdate: "2024-09-15",
-      category: "Technical Issue"
+  // Fetch real support tickets from database
+  const supportTickets = await db.supportTicket.findMany({
+    where: { shop: session.shop },
+    include: {
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 1 // Get latest message for preview
+      },
+      assignedTo: {
+        select: { name: true }
+      }
     },
-    {
-      id: "TICK-002", 
-      subject: "Billing Question",
-      status: "resolved",
-      priority: "medium",
-      created: "2024-09-14",
-      lastUpdate: "2024-09-14",
-      category: "Billing"
-    },
-    {
-      id: "TICK-003",
-      subject: "Feature Request - Analytics Export",
-      status: "in_progress",
-      priority: "low",
-      created: "2024-09-13",
-      lastUpdate: "2024-09-15",
-      category: "Feature Request"
-    }
-  ];
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Format tickets for display
+  const formattedTickets = supportTickets.map(ticket => ({
+    id: ticket.ticketNumber,
+    subject: ticket.subject,
+    status: ticket.status,
+    priority: ticket.priority,
+    created: ticket.createdAt.toISOString().split('T')[0],
+    lastUpdate: ticket.updatedAt.toISOString().split('T')[0],
+    category: ticket.category,
+    description: ticket.description,
+    assignedTo: ticket.assignedTo?.name,
+    messages: ticket.messages
+  }));
 
   return json({
     shop: session.shop,
-    supportTickets
+    supportTickets: formattedTickets
   });
 };
 
@@ -67,22 +67,71 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const action = formData.get("action");
 
   if (action === "create_ticket") {
-    const ticketData = {
-      subject: formData.get("subject"),
-      category: formData.get("category"),
-      priority: formData.get("priority"),
-      description: formData.get("description"),
-      shop: session.shop
-    };
+    const subject = formData.get("subject") as string;
+    const category = formData.get("category") as string;
+    const priority = formData.get("priority") as string;
+    const description = formData.get("description") as string;
+    const customerEmail = formData.get("customerEmail") as string;
+    const customerName = formData.get("customerName") as string;
 
-    // In real app, save to database
-    console.log("Creating support ticket:", ticketData);
+    try {
+      // Generate unique ticket number
+      const ticketNumber = `SUP-${Date.now().toString().slice(-6)}`;
 
-    return json({
-      success: true,
-      message: "Support ticket created successfully! We'll get back to you within 24 hours.",
-      ticketId: `TICK-${Date.now()}`
-    });
+      // Create ticket in database
+      const ticket = await db.supportTicket.create({
+        data: {
+          ticketNumber,
+          shop: session.shop,
+          subject,
+          description,
+          category,
+          priority,
+          customerEmail: customerEmail || null,
+          customerName: customerName || null,
+          status: 'open'
+        }
+      });
+
+      // Create initial message
+      await db.supportMessage.create({
+        data: {
+          ticketId: ticket.id,
+          message: description,
+          isFromCustomer: true,
+          authorName: customerName || 'Customer',
+          authorEmail: customerEmail || null
+        }
+      });
+
+      // Send email notification to support team
+      try {
+        await EmailService.sendTicketCreatedNotification({
+          ticketNumber: ticket.ticketNumber,
+          subject: ticket.subject,
+          customerName: customerName || 'Customer',
+          customerEmail: customerEmail || 'No email provided',
+          description: ticket.description,
+          priority: ticket.priority,
+          category: ticket.category
+        });
+      } catch (emailError) {
+        console.error('Email notification error:', emailError);
+        // Don't fail the request if email fails
+      }
+
+      return json({
+        success: true,
+        message: "Support ticket created successfully! We'll get back to you within 24 hours.",
+        ticketId: ticket.ticketNumber
+      });
+    } catch (error) {
+      console.error('Error creating support ticket:', error);
+      return json({
+        success: false,
+        message: "Failed to create support ticket. Please try again."
+      });
+    }
   }
 
   return json({ success: false, message: "Invalid action" });
@@ -97,7 +146,9 @@ export default function Support() {
     subject: "",
     category: "technical",
     priority: "medium",
-    description: ""
+    description: "",
+    customerName: "",
+    customerEmail: ""
   });
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -109,6 +160,8 @@ export default function Support() {
     data.append("category", formData.category);
     data.append("priority", formData.priority);
     data.append("description", formData.description);
+    data.append("customerName", formData.customerName);
+    data.append("customerEmail", formData.customerEmail);
     
     submit(data, { method: "post" });
     setShowCreateModal(false);
@@ -118,7 +171,9 @@ export default function Support() {
       subject: "",
       category: "technical",
       priority: "medium",
-      description: ""
+      description: "",
+      customerName: "",
+      customerEmail: ""
     });
   };
 
@@ -341,6 +396,23 @@ export default function Support() {
       >
         <Modal.Section>
           <FormLayout>
+            <TextField
+              label="Your Name"
+              value={formData.customerName}
+              onChange={(value) => setFormData({ ...formData, customerName: value })}
+              placeholder="Your full name"
+              autoComplete="name"
+            />
+
+            <TextField
+              label="Email Address"
+              value={formData.customerEmail}
+              onChange={(value) => setFormData({ ...formData, customerEmail: value })}
+              placeholder="your.email@example.com"
+              type="email"
+              autoComplete="email"
+            />
+
             <TextField
               label="Subject"
               value={formData.subject}

@@ -46,6 +46,7 @@ export default function AdminLayout() {
   const navigation = [
     { name: "Dashboard", href: "/admin", icon: "📊", current: location.pathname === "/admin" },
     { name: "Customers", href: "/admin/customers", icon: "👥", current: location.pathname === "/admin/customers" },
+    { name: "Support", href: "/admin/support", icon: "🎧", current: location.pathname === "/admin/support" },
     { name: "Analytics", href: "/admin/analytics", icon: "📈", current: location.pathname === "/admin/analytics" },
     { name: "System Logs", href: "/admin/logs", icon: "📋", current: location.pathname === "/admin/logs" },
     { name: "Billing", href: "/admin/billing", icon: "💳", current: location.pathname === "/admin/billing" },
