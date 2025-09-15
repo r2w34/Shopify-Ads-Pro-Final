@@ -30,6 +30,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { db } from "../db.server";
+import { FacebookAdsService, CAMPAIGN_OBJECTIVES, OPTIMIZATION_GOALS, BILLING_EVENTS } from "../services/facebook-ads.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
@@ -207,25 +208,47 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const adCopy = formData.get("adCopy") as string;
 
     try {
-      const { FacebookAdsService } = await import("../services/facebook.server");
-      const facebookService = await FacebookAdsService.getForShop(shop);
-      
-      if (!facebookService) {
+      // Get Facebook account with access token
+      const facebookAccount = await db.facebookAccount.findFirst({
+        where: { shop, isActive: true },
+        include: {
+          pages: {
+            include: {
+              instagramAccounts: true,
+            },
+          },
+        },
+      });
+
+      if (!facebookAccount) {
         return json({ 
           success: false, 
           message: "Facebook account not connected." 
         });
       }
 
-      // Get Facebook account
-      const facebookAccount = await db.facebookAccount.findFirst({
-        where: { shop, isActive: true },
-      });
+      // Initialize Facebook Ads service
+      const facebookAdsService = new FacebookAdsService(facebookAccount.accessToken);
 
-      if (!facebookAccount) {
+      // Parse ad copy data
+      let parsedAdCopy;
+      try {
+        parsedAdCopy = JSON.parse(adCopy);
+      } catch (e) {
+        parsedAdCopy = {
+          primaryText: "Check out our amazing products!",
+          headline: "Shop Now",
+          description: "Limited time offer - don't miss out!",
+          callToAction: "SHOP_NOW"
+        };
+      }
+
+      // Get the first page for creative
+      const facebookPage = facebookAccount.pages[0];
+      if (!facebookPage) {
         return json({ 
           success: false, 
-          message: "Facebook account not found." 
+          message: "No Facebook page found. Please connect a Facebook page." 
         });
       }
 
@@ -246,29 +269,62 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       });
 
-      // Create campaign on Facebook
-      try {
-        const facebookCampaignId = await facebookService.createCampaign({
-          name: campaignName,
-          objective,
-          status: "PAUSED",
-          budget,
-          budgetType,
-        });
+      console.log("🚀 Creating complete Facebook campaign...");
 
-        // Update campaign with Facebook ID
+      // Create complete campaign structure on Facebook
+      const campaignResult = await facebookAdsService.createCompleteCampaign(
+        selectedAdAccount.replace('act_', ''), // Remove 'act_' prefix
+        {
+          // Campaign level
+          campaignName: campaignName,
+          objective: objective,
+          
+          // Ad Set level
+          adSetName: `${campaignName} - Ad Set`,
+          optimizationGoal: objective === "OUTCOME_TRAFFIC" ? "LINK_CLICKS" : "CONVERSIONS",
+          billingEvent: "LINK_CLICKS",
+          dailyBudget: budgetType === "DAILY" ? Math.round(budget * 100) : undefined, // Convert to cents
+          lifetimeBudget: budgetType === "LIFETIME" ? Math.round(budget * 100) : undefined,
+          targeting: {
+            geo_locations: {
+              countries: ["US"] // Default targeting - can be enhanced
+            },
+            age_min: 18,
+            age_max: 65,
+          },
+          
+          // Creative level
+          creativeName: `${campaignName} - Creative`,
+          adCopy: parsedAdCopy,
+          linkUrl: `https://${shop}`, // Link to Shopify store
+          pageId: facebookPage.facebookPageId,
+          instagramActorId: facebookPage.instagramAccounts[0]?.instagramAccountId,
+          
+          // Ad level
+          adName: `${campaignName} - Ad`,
+        }
+      );
+
+      if (campaignResult.success) {
+        // Update campaign with Facebook IDs
         await db.campaign.update({
           where: { id: campaign.id },
-          data: { facebookCampaignId }
+          data: { 
+            facebookCampaignId: campaignResult.campaign?.id,
+            status: "PAUSED" // Keep paused until user activates
+          }
         });
+
+        console.log("✅ Complete Facebook campaign created successfully!");
 
         return json({ 
           success: true, 
           campaignId: campaign.id,
-          message: "Campaign created successfully!" 
+          facebookCampaignId: campaignResult.campaign?.id,
+          message: "Complete campaign created successfully! Campaign is paused and ready for review." 
         });
-      } catch (fbError: any) {
-        console.error("Facebook campaign creation error:", fbError);
+      } else {
+        console.error("❌ Facebook campaign creation failed:", campaignResult.error);
         
         // Keep the local campaign but mark it as failed
         await db.campaign.update({
@@ -278,7 +334,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         return json({ 
           success: false, 
-          message: `Campaign created locally but Facebook creation failed: ${fbError.message}` 
+          message: `Campaign creation failed: ${campaignResult.error}` 
         });
       }
     } catch (error: any) {
