@@ -40,7 +40,7 @@
     "@types/bcryptjs": "^2.4.6",
     "axios": "^1.12.1",
     "bcryptjs": "^3.0.2",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.2.1",
     "facebook-nodejs-business-sdk": "^20.0.3",
     "isbot": "^5.1.0",
     "openai": "^4.104.0",
