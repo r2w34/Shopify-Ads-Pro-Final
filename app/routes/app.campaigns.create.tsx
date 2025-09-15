@@ -58,8 +58,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   if (!facebookAccount) {
-    console.log("❌ Campaign Create - No Facebook account found, redirecting to facebook-settings");
-    return redirect("/app/facebook-settings?error=not_connected");
+    console.log("❌ Campaign Create - No Facebook account found, redirecting to app with error");
+    return redirect("/app?error=facebook_not_connected");
   }
 
   // Get products from Shopify
