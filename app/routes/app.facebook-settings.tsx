@@ -16,59 +16,36 @@ import {
 } from "@shopify/polaris";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  try {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
-    
-    // Check Facebook connection status
-    const facebookAccount = await db.facebookAccount.findFirst({
-      where: { shop, isActive: true },
-      include: {
-        adAccounts: true,
-        pages: true
-      }
-    });
-    
-    return json({
-      shop: session.shop,
-      isConnected: !!facebookAccount,
-      facebookAccount: facebookAccount ? {
-        facebookUserId: facebookAccount.facebookUserId,
-        businessId: facebookAccount.businessId,
-        adAccountId: facebookAccount.adAccountId,
-        pageId: facebookAccount.pageId,
-        adAccounts: facebookAccount.adAccounts,
-        pages: facebookAccount.pages,
-        createdAt: facebookAccount.createdAt
-      } : null
-    });
-  } catch (error) {
-    console.error('Facebook settings loader error:', error);
-    return json({
-      shop: 'unknown',
-      isConnected: false,
-      facebookAccount: null,
-      error: 'Authentication failed'
-    });
-  }
+  // Parent route (app.tsx) handles authentication, so we can safely call authenticate here
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  
+  // Check Facebook connection status
+  const facebookAccount = await db.facebookAccount.findFirst({
+    where: { shop, isActive: true },
+    include: {
+      adAccounts: true,
+      pages: true
+    }
+  });
+  
+  return json({
+    shop: session.shop,
+    isConnected: !!facebookAccount,
+    facebookAccount: facebookAccount ? {
+      facebookUserId: facebookAccount.facebookUserId,
+      businessId: facebookAccount.businessId,
+      adAccountId: facebookAccount.adAccountId,
+      pageId: facebookAccount.pageId,
+      adAccounts: facebookAccount.adAccounts,
+      pages: facebookAccount.pages,
+      createdAt: facebookAccount.createdAt
+    } : null
+  });
 }
 
 export default function FacebookSettings() {
-  const { shop, isConnected, facebookAccount, error } = useLoaderData<typeof loader>();
-
-  if (error) {
-    return (
-      <Page title="Facebook Settings">
-        <Layout>
-          <Layout.Section>
-            <Banner title="Error" status="critical">
-              <p>Error: {error}</p>
-            </Banner>
-          </Layout.Section>
-        </Layout>
-      </Page>
-    );
-  }
+  const { shop, isConnected, facebookAccount } = useLoaderData<typeof loader>();
 
   const handleConnectFacebook = () => {
     // Redirect to Facebook OAuth
