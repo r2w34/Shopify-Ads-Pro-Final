@@ -11,22 +11,16 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    const { admin } = await authenticate.admin(request);
-    
-    return json({
-      apiKey: process.env.SHOPIFY_API_KEY || "",
-      shop: admin.rest.session.shop,
-    });
-  } catch (error) {
-    console.error('App authentication error:', error);
-    // For embedded apps, let Shopify handle the authentication
-    throw error;
-  }
+  const { admin } = await authenticate.admin(request);
+  
+  return json({
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    shop: admin.rest.session.shop,
+  });
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, shop } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
