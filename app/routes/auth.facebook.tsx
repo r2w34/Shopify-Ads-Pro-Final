@@ -18,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     facebookAuthUrl.searchParams.set("client_id", facebookAppId);
     facebookAuthUrl.searchParams.set("redirect_uri", redirectUri);
     facebookAuthUrl.searchParams.set("state", state);
-    facebookAuthUrl.searchParams.set("scope", "ads_management,ads_read,business_management,pages_read_engagement");
+    facebookAuthUrl.searchParams.set("scope", "ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,instagram_manage_insights,catalog_management");
     facebookAuthUrl.searchParams.set("response_type", "code");
 
     return redirect(facebookAuthUrl.toString());

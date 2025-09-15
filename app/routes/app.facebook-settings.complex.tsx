@@ -23,15 +23,42 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Simplified loader - avoid complex database queries that might fail
+    // Get Facebook account from database
+    const { db } = await import("../db.server");
+    const facebookAccount = await db.facebookAccount.findFirst({
+      where: { shop, isActive: true },
+      include: {
+        adAccounts: true,
+        pages: {
+          include: {
+            instagramAccounts: true,
+          },
+        },
+      },
+    });
+
     return json({
-      facebookAccount: null,
-      isConnected: false,
+      facebookAccount: facebookAccount ? {
+        id: facebookAccount.id,
+        facebookUserId: facebookAccount.facebookUserId,
+        businessId: facebookAccount.businessId,
+        adAccountId: facebookAccount.adAccountId,
+        pageId: facebookAccount.pageId,
+        isActive: facebookAccount.isActive,
+        createdAt: facebookAccount.createdAt,
+        updatedAt: facebookAccount.updatedAt,
+      } : null,
+      isConnected: !!facebookAccount,
       shop,
-      mockData: {
-        adAccounts: [],
-        pages: []
-      }
+      adAccounts: facebookAccount?.adAccounts || [],
+      pages: facebookAccount?.pages || [],
+      instagramAccounts: facebookAccount?.pages.flatMap(page => 
+        page.instagramAccounts.map(ig => ({
+          ...ig,
+          pageId: page.pageId,
+          pageName: page.name,
+        }))
+      ) || []
     });
   } catch (error) {
     console.error('Facebook settings loader error:', error);
@@ -39,6 +66,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       facebookAccount: null,
       isConnected: false,
       shop: 'unknown',
+      adAccounts: [],
+      pages: [],
+      instagramAccounts: [],
       error: 'Authentication failed'
     });
   }
@@ -51,14 +81,49 @@ export async function action({ request }: ActionFunctionArgs) {
     const formData = await request.formData();
     const action = formData.get("action");
 
+    const { db } = await import("../db.server");
+
     if (action === "disconnect") {
-      // Simplified action - just return success for now
+      // Deactivate Facebook account
+      await db.facebookAccount.updateMany({
+        where: { shop, isActive: true },
+        data: { isActive: false, updatedAt: new Date() }
+      });
+      
       return json({ success: true, message: "Facebook account disconnected" });
     }
 
     if (action === "select_ad_account") {
       const adAccountId = formData.get("adAccountId") as string;
-      // Simplified action - just return success for now
+      
+      // Update the default ad account
+      const facebookAccount = await db.facebookAccount.findFirst({
+        where: { shop, isActive: true }
+      });
+
+      if (facebookAccount) {
+        // Remove default from all ad accounts
+        await db.adAccount.updateMany({
+          where: { facebookAccountId: facebookAccount.id },
+          data: { isDefault: false }
+        });
+
+        // Set new default
+        await db.adAccount.updateMany({
+          where: { 
+            facebookAccountId: facebookAccount.id,
+            adAccountId: adAccountId
+          },
+          data: { isDefault: true }
+        });
+
+        // Update Facebook account with selected ad account
+        await db.facebookAccount.update({
+          where: { id: facebookAccount.id },
+          data: { adAccountId: adAccountId }
+        });
+      }
+      
       return json({ success: true, message: "Ad account selected", adAccountId });
     }
 
@@ -75,7 +140,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function FacebookSettings() {
-  const { facebookAccount, isConnected, shop } = useLoaderData<typeof loader>();
+  const { facebookAccount, isConnected, shop, adAccounts, pages, instagramAccounts } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const [selectedAdAccount, setSelectedAdAccount] = useState(
     facebookAccount?.adAccountId || ""
@@ -85,8 +150,8 @@ export default function FacebookSettings() {
     const state = btoa(JSON.stringify({ shop, timestamp: Date.now() }));
     const authUrl = 'https://www.facebook.com/v18.0/dialog/oauth?' +
       'client_id=342313695281811&' +
-      'redirect_uri=' + encodeURIComponent('https://ainet.sellerai.in/auth/facebook/callback') + '&' +
-      'scope=ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,instagram_manage_insights&' +
+      'redirect_uri=' + encodeURIComponent('https://fbai-app.trustclouds.in/auth/facebook/callback') + '&' +
+      'scope=ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,instagram_manage_insights,catalog_management&' +
       'response_type=code&' +
       'state=' + state;
 
@@ -138,17 +203,17 @@ export default function FacebookSettings() {
   };
 
   const getAdAccountOptions = () => {
-    if (!facebookAccount?.adAccounts) return [];
+    if (!adAccounts || adAccounts.length === 0) return [];
     
-    return facebookAccount.adAccounts.map(account => ({
+    return adAccounts.map(account => ({
       label: `${account.name} (${account.currency}) - ${account.adAccountId}`,
       value: account.adAccountId
     }));
   };
 
   const getCurrentAdAccount = () => {
-    if (!facebookAccount?.adAccounts) return null;
-    return facebookAccount.adAccounts.find(acc => acc.adAccountId === selectedAdAccount);
+    if (!adAccounts || adAccounts.length === 0) return null;
+    return adAccounts.find(acc => acc.adAccountId === selectedAdAccount);
   };
 
   const currentAdAccount = getCurrentAdAccount();
@@ -223,7 +288,7 @@ export default function FacebookSettings() {
                     </Button>
                   </InlineStack>
 
-                  {facebookAccount?.adAccounts && facebookAccount.adAccounts.length > 0 && (
+                  {adAccounts && adAccounts.length > 0 && (
                     <>
                       <Divider />
                       
@@ -268,7 +333,7 @@ export default function FacebookSettings() {
                     </>
                   )}
 
-                  {facebookAccount?.pages && facebookAccount.pages.length > 0 && (
+                  {pages && pages.length > 0 && (
                     <>
                       <Divider />
                       
@@ -279,7 +344,7 @@ export default function FacebookSettings() {
                         </Text>
                         
                         <BlockStack gap="200">
-                          {facebookAccount.pages.map((page) => (
+                          {pages.map((page) => (
                             <Card key={page.id} background="bg-surface-secondary">
                               <InlineStack align="space-between">
                                 <BlockStack gap="100">
