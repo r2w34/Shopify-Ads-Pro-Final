@@ -19,11 +19,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     console.error('App route authentication error:', error);
     // Instead of throwing, return a response that will trigger re-authentication
-    throw new Response('Authentication required', { 
-      status: 302, 
-      headers: { 
-        Location: '/auth/login' 
-      } 
+    throw new Response('Authentication required', {
+      status: 302,
+      headers: {
+        Location: '/auth/login'
+      }
     });
   }
 };
@@ -44,7 +44,7 @@ export default function App() {
         <Link to="/app/performance-insights">AI Performance</Link>
         <Link to="/app/facebook-settings">Facebook Settings</Link>
         <Link to="/app/subscription">Subscription</Link>
-        <Link to="/app/ui-showcase">UI Showcase</Link>
+        <Link to="/app/support">Support</Link>
       </NavMenu>
       <Outlet />
     </AppProvider>

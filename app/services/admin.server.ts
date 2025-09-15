@@ -82,14 +82,7 @@ export class AdminService {
       db.customer.findMany({
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: {
-              shop: true
-            }
-          }
-        }
+        orderBy: { createdAt: 'desc' }
       }),
       db.customer.count()
     ]);
@@ -97,10 +90,12 @@ export class AdminService {
     return {
       customers,
       pagination: {
-        page,
+        current: page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
       }
     };
   }
@@ -270,10 +265,10 @@ export class AdminService {
       db.customer.count({ where: { isActive: true } }),
       db.subscription.count(),
       db.subscription.count({ where: { status: 'active' } }),
-      db.subscription.aggregate({
+      // Calculate total revenue from customers
+      db.customer.aggregate({
         _sum: { 
-          // This would need to be calculated based on billing records
-          // For now, we'll use a placeholder
+          totalRevenue: true
         }
       }),
       db.customer.findMany({
@@ -318,6 +313,9 @@ export class AdminService {
         totalImpressions: campaignStats._sum.impressions || 0,
         totalClicks: campaignStats._sum.clicks || 0,
         totalConversions: campaignStats._sum.conversions || 0
+      },
+      revenue: {
+        total: totalRevenue._sum.totalRevenue || 0
       },
       recentCustomers
     };
@@ -438,6 +436,119 @@ export class AdminService {
           'audit.read'
         ])
       }
+    });
+  }
+
+  // Customer Management Methods
+  static async blockCustomer(customerId: string, reason: string) {
+    return await db.customer.update({
+      where: { id: customerId },
+      data: { 
+        isBlocked: true,
+        blockReason: reason,
+        isActive: false
+      }
+    });
+  }
+
+  static async unblockCustomer(customerId: string) {
+    return await db.customer.update({
+      where: { id: customerId },
+      data: { 
+        isBlocked: false,
+        blockReason: null,
+        isActive: true
+      }
+    });
+  }
+
+  static async activateCustomer(customerId: string) {
+    return await db.customer.update({
+      where: { id: customerId },
+      data: { isActive: true }
+    });
+  }
+
+  static async deactivateCustomer(customerId: string) {
+    return await db.customer.update({
+      where: { id: customerId },
+      data: { isActive: false }
+    });
+  }
+
+  // Settings Management Methods
+  static async getAllSettings() {
+    return await db.adminSettings.findMany({
+      orderBy: [
+        { category: 'asc' },
+        { key: 'asc' }
+      ]
+    });
+  }
+
+  // Analytics Methods
+  static async getAnalytics() {
+    // Mock analytics data - replace with real implementation
+    return {
+      overview: {
+        totalRevenue: 15420.50,
+        totalCustomers: await db.customer.count(),
+        activeCampaigns: await db.campaign.count({ where: { status: 'active' } }),
+        conversionRate: 3.2
+      },
+      revenueChart: [],
+      topCampaigns: [],
+      customerGrowth: []
+    };
+  }
+
+  // System Logs Methods
+  static async getSystemLogs({ level, page, limit }: { level: string; page: number; limit: number }) {
+    // Mock logs data - replace with real implementation
+    return {
+      logs: [],
+      pagination: {
+        current: page,
+        total: 1,
+        hasNext: false,
+        hasPrev: false
+      }
+    };
+  }
+
+  // Billing Methods
+  static async getBillingData() {
+    // Mock billing data - replace with real implementation
+    return {
+      overview: {
+        totalRevenue: 45230.75,
+        monthlyRecurring: 12450.00,
+        activeSubscriptions: await db.subscription.count({ where: { status: 'active' } }),
+        churnRate: 2.3,
+        averageRevenuePerUser: 79.81
+      },
+      recentTransactions: [],
+      subscriptionPlans: [],
+      failedPayments: []
+    };
+  }
+
+  static async updateCustomerPlan(customerId: string, planId: string) {
+    return await db.subscription.update({
+      where: { customerId },
+      data: { planId }
+    });
+  }
+
+  static async processRefund(paymentId: string, amount: number) {
+    // Mock refund processing - replace with real Stripe implementation
+    return { success: true, refundId: `re_${Date.now()}` };
+  }
+
+  static async suspendCustomer(customerId: string) {
+    return await db.customer.update({
+      where: { id: customerId },
+      data: { status: 'suspended' }
     });
   }
 }

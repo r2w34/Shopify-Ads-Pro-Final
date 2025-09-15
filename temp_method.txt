@@ -1,0 +1,27 @@
+  static async getAdminUser(request: Request): Promise<AdminUser | null> {
+    try {
+      const session = await this.getSession(request);
+      const adminId = session.get("adminId");
+
+        return null;
+      }
+
+      const admin = await db.adminUser.findUnique({
+        where: { id: adminId, isActive: true }
+      });
+
+        return null;
+      }
+
+      return {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        role: admin.role as 'super_admin' | 'admin' | 'support',
+        isActive: admin.isActive
+      };
+    } catch {
+      return null;
+    }
+  }
+

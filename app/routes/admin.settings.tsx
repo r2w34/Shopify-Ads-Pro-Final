@@ -1,31 +1,14 @@
-import { useState, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import {
-  Page,
-  Layout,
-  Card,
-  Button,
-  BlockStack,
-  InlineStack,
-  Text,
-  Badge,
-  TextField,
-  Select,
-  Modal,
-  Banner,
-  Tabs,
-  Divider,
-  ButtonGroup,
-  Checkbox,
-  DataTable,
-} from "@shopify/polaris";
 import { AdminService } from "../services/admin.server";
+import { AdminAuthService } from "../services/admin-auth.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const admin = await AdminAuthService.requireAdminAuth(request);
+
   try {
-    const settings = await AdminService.getSettings();
+    const settings = await AdminService.getAllSettings();
     
     // Group settings by category
     const groupedSettings = settings.reduce((acc, setting) => {
@@ -34,564 +17,296 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
       acc[setting.category].push(setting);
       return acc;
-    }, {} as Record<string, any[]>);
+    }, {} as Record<string, typeof settings>);
 
     return json({
-      settings,
-      groupedSettings,
-      categories: Object.keys(groupedSettings).sort()
+      settings: groupedSettings,
+      categories: Object.keys(groupedSettings)
     });
   } catch (error) {
-    console.error("Admin settings error:", error);
+    console.error("Error loading settings:", error);
     return json({
-      settings: [],
-      groupedSettings: {},
-      categories: []
+      settings: {},
+      categories: [],
+      error: "Failed to load settings"
     });
   }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const admin = await AdminAuthService.requireAdminAuth(request);
   const formData = await request.formData();
   const action = formData.get("action");
 
-  if (action === "update_setting") {
-    const key = formData.get("key") as string;
-    const value = formData.get("value") as string;
-    const description = formData.get("description") as string;
-    const category = formData.get("category") as string;
-    const isEncrypted = formData.get("isEncrypted") === "true";
-
-    try {
-      await AdminService.updateSetting({
-        key,
-        value,
-        description,
-        category,
-        isEncrypted
-      }, "admin-demo");
-
-      return json({ success: true, message: "Setting updated successfully" });
-    } catch (error: any) {
-      return json({ success: false, message: error.message });
+  try {
+    switch (action) {
+      case "update":
+        const key = formData.get("key") as string;
+        const value = formData.get("value") as string;
+        const description = formData.get("description") as string;
+        const category = formData.get("category") as string;
+        await AdminService.updateSetting({
+          key,
+          value,
+          description,
+          category
+        }, admin.id);
+        break;
+      case "reset":
+        await AdminService.initializeDefaultSettings();
+        break;
     }
+
+    return json({ success: true });
+  } catch (error) {
+    console.error("Settings action error:", error);
+    return json({ error: "Action failed" }, { status: 500 });
   }
-
-  if (action === "delete_setting") {
-    const key = formData.get("key") as string;
-
-    try {
-      // In a real app, you'd implement delete functionality
-      return json({ success: true, message: "Setting deleted successfully" });
-    } catch (error: any) {
-      return json({ success: false, message: error.message });
-    }
-  }
-
-  if (action === "bulk_update") {
-    const settingsData = JSON.parse(formData.get("settingsData") as string);
-
-    try {
-      for (const setting of settingsData) {
-        await AdminService.updateSetting(setting, "admin-demo");
-      }
-
-      return json({ 
-        success: true, 
-        message: `${settingsData.length} settings updated successfully` 
-      });
-    } catch (error: any) {
-      return json({ success: false, message: error.message });
-    }
-  }
-
-  return json({ success: false, message: "Unknown action" });
 };
 
 export default function AdminSettings() {
-  const data = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<typeof action>();
-  
-  const [selectedTab, setSelectedTab] = useState(0);
-  const [showSettingModal, setShowSettingModal] = useState(false);
-  const [editingSetting, setEditingSetting] = useState<any>(null);
-  const [bulkEditMode, setBulkEditMode] = useState(false);
-  const [bulkSettings, setBulkSettings] = useState<any[]>([]);
+  const { settings, categories, error } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher();
 
-  const categories = ['all', ...data.categories];
-  const currentCategory = categories[selectedTab];
-  const currentSettings = currentCategory === 'all' 
-    ? data.settings 
-    : data.groupedSettings[currentCategory] || [];
-
-  const tabs = categories.map(category => ({
-    id: category,
-    content: category === 'all' 
-      ? `All Settings (${data.settings.length})`
-      : `${category.charAt(0).toUpperCase() + category.slice(1)} (${data.groupedSettings[category]?.length || 0})`
-  }));
-
-  const openSettingModal = (setting?: any) => {
-    setEditingSetting(setting || {
-      key: '',
-      value: '',
-      description: '',
-      category: currentCategory === 'all' ? 'general' : currentCategory,
-      isEncrypted: false
-    });
-    setShowSettingModal(true);
+  const handleUpdateSetting = (key: string, value: string, description?: string, category?: string) => {
+    const formData = new FormData();
+    formData.append("action", "update");
+    formData.append("key", key);
+    formData.append("value", value);
+    formData.append("description", description || "");
+    formData.append("category", category || "general");
+    fetcher.submit(formData, { method: "post" });
   };
 
-  const closeSettingModal = () => {
-    setShowSettingModal(false);
-    setEditingSetting(null);
-  };
-
-  const saveSetting = () => {
-    if (editingSetting) {
-      fetcher.submit({
-        action: "update_setting",
-        key: editingSetting.key,
-        value: editingSetting.value,
-        description: editingSetting.description,
-        category: editingSetting.category,
-        isEncrypted: editingSetting.isEncrypted.toString()
-      }, { method: "POST" });
+  const handleResetSettings = () => {
+    if (confirm("Are you sure you want to reset all settings to defaults? This cannot be undone.")) {
+      const formData = new FormData();
+      formData.append("action", "reset");
+      fetcher.submit(formData, { method: "post" });
     }
   };
-
-  const deleteSetting = (key: string) => {
-    if (confirm(`Are you sure you want to delete the setting "${key}"?`)) {
-      fetcher.submit({
-        action: "delete_setting",
-        key
-      }, { method: "POST" });
-    }
-  };
-
-  const startBulkEdit = () => {
-    setBulkEditMode(true);
-    setBulkSettings(currentSettings.map(s => ({ ...s })));
-  };
-
-  const cancelBulkEdit = () => {
-    setBulkEditMode(false);
-    setBulkSettings([]);
-  };
-
-  const saveBulkSettings = () => {
-    const changedSettings = bulkSettings.filter((setting, index) => {
-      const original = currentSettings[index];
-      return setting.value !== original.value || 
-             setting.description !== original.description ||
-             setting.category !== original.category;
-    });
-
-    if (changedSettings.length > 0) {
-      fetcher.submit({
-        action: "bulk_update",
-        settingsData: JSON.stringify(changedSettings)
-      }, { method: "POST" });
-    }
-
-    setBulkEditMode(false);
-    setBulkSettings([]);
-  };
-
-  const updateBulkSetting = (index: number, field: string, value: any) => {
-    const updated = [...bulkSettings];
-    updated[index] = { ...updated[index], [field]: value };
-    setBulkSettings(updated);
-  };
-
-  const getCategoryBadge = (category: string) => {
-    const colors: Record<string, any> = {
-      api: 'info',
-      billing: 'warning',
-      features: 'success',
-      general: 'subdued',
-      limits: 'critical'
-    };
-    
-    return <Badge tone={colors[category] || 'subdued'}>{category}</Badge>;
-  };
-
-  const getDefaultSettings = () => {
-    return [
-      {
-        key: 'openai_api_key',
-        value: '',
-        description: 'OpenAI API Key for AI features',
-        category: 'api',
-        isEncrypted: true
-      },
-      {
-        key: 'facebook_app_id',
-        value: '',
-        description: 'Facebook App ID',
-        category: 'api',
-        isEncrypted: false
-      },
-      {
-        key: 'facebook_app_secret',
-        value: '',
-        description: 'Facebook App Secret',
-        category: 'api',
-        isEncrypted: true
-      },
-      {
-        key: 'ai_features_enabled',
-        value: 'true',
-        description: 'Enable AI-powered features',
-        category: 'features',
-        isEncrypted: false
-      },
-      {
-        key: 'trial_days',
-        value: '14',
-        description: 'Default trial period in days',
-        category: 'billing',
-        isEncrypted: false
-      },
-      {
-        key: 'max_campaigns_per_customer',
-        value: '100',
-        description: 'Maximum campaigns per customer',
-        category: 'limits',
-        isEncrypted: false
-      }
-    ];
-  };
-
-  const initializeDefaultSettings = () => {
-    const defaultSettings = getDefaultSettings();
-    fetcher.submit({
-      action: "bulk_update",
-      settingsData: JSON.stringify(defaultSettings)
-    }, { method: "POST" });
-  };
-
-  useEffect(() => {
-    if (fetcher.data?.success) {
-      if (showSettingModal) {
-        closeSettingModal();
-      }
-      if (bulkEditMode) {
-        setBulkEditMode(false);
-        setBulkSettings([]);
-      }
-      // Reload page to show updated data
-      setTimeout(() => window.location.reload(), 1000);
-    }
-  }, [fetcher.data]);
 
   return (
-    <Page
-      title="Application Settings"
-      subtitle="Manage API keys, feature flags, and system configuration"
-      primaryAction={{
-        content: "Add Setting",
-        onAction: () => openSettingModal()
-      }}
-      secondaryActions={[
-        {
-          content: bulkEditMode ? "Cancel Bulk Edit" : "Bulk Edit",
-          onAction: bulkEditMode ? cancelBulkEdit : startBulkEdit,
-          disabled: currentSettings.length === 0
-        },
-        {
-          content: "Initialize Defaults",
-          onAction: initializeDefaultSettings
-        }
-      ]}
-    >
-      <Layout>
-        <Layout.Section>
-          <BlockStack gap="500">
-            {data.settings.length === 0 && (
-              <Banner
-                title="No settings configured"
-                status="info"
-                action={{
-                  content: "Initialize Default Settings",
-                  onAction: initializeDefaultSettings
-                }}
-              >
-                <p>Get started by initializing the default application settings.</p>
-              </Banner>
-            )}
+    <div style={{ padding: "20px" }}>
+      <div style={{ marginBottom: "20px" }}>
+        <h1 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "10px" }}>
+          System Settings
+        </h1>
+        <p style={{ color: "#666", marginBottom: "20px" }}>
+          Configure application settings and preferences
+        </p>
+      </div>
 
-            <Card>
-              <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab}>
-                <div style={{ marginTop: '20px' }}>
-                  {bulkEditMode ? (
-                    <BlockStack gap="400">
-                      <InlineStack align="space-between">
-                        <Text as="h2" variant="headingMd">
-                          Bulk Edit Mode - {currentSettings.length} settings
-                        </Text>
-                        <ButtonGroup>
-                          <Button 
-                            variant="primary" 
-                            onClick={saveBulkSettings}
-                            loading={fetcher.state === "submitting"}
-                          >
-                            Save All Changes
-                          </Button>
-                          <Button onClick={cancelBulkEdit}>Cancel</Button>
-                        </ButtonGroup>
-                      </InlineStack>
+      {error && (
+        <div style={{ 
+          backgroundColor: "#fee", 
+          border: "1px solid #fcc", 
+          padding: "10px", 
+          borderRadius: "4px", 
+          marginBottom: "20px",
+          color: "#c00"
+        }}>
+          {error}
+        </div>
+      )}
 
-                      <BlockStack gap="300">
-                        {bulkSettings.map((setting, index) => (
-                          <Card key={setting.key}>
-                            <BlockStack gap="300">
-                              <InlineStack gap="200" align="start">
-                                <Text as="h3" variant="headingSm">{setting.key}</Text>
-                                {getCategoryBadge(setting.category)}
-                                {setting.isEncrypted && <Badge tone="critical">Encrypted</Badge>}
-                              </InlineStack>
+      {fetcher.data?.success && (
+        <div style={{ 
+          backgroundColor: "#dfd", 
+          border: "1px solid #cfc", 
+          padding: "10px", 
+          borderRadius: "4px", 
+          marginBottom: "20px",
+          color: "#060"
+        }}>
+          Settings updated successfully!
+        </div>
+      )}
 
-                              <InlineStack gap="400">
-                                <TextField
-                                  label="Value"
-                                  value={setting.value}
-                                  onChange={(value) => updateBulkSetting(index, 'value', value)}
-                                  type={setting.isEncrypted ? "password" : "text"}
-                                  autoComplete="off"
-                                />
+      {fetcher.data?.error && (
+        <div style={{ 
+          backgroundColor: "#fee", 
+          border: "1px solid #fcc", 
+          padding: "10px", 
+          borderRadius: "4px", 
+          marginBottom: "20px",
+          color: "#c00"
+        }}>
+          {fetcher.data.error}
+        </div>
+      )}
 
-                                <TextField
-                                  label="Description"
-                                  value={setting.description || ''}
-                                  onChange={(value) => updateBulkSetting(index, 'description', value)}
-                                  autoComplete="off"
-                                />
+      {/* Reset Button */}
+      <div style={{ marginBottom: "30px" }}>
+        <button
+          onClick={handleResetSettings}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#dc3545",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "14px"
+          }}
+        >
+          Reset All Settings to Defaults
+        </button>
+      </div>
 
-                                <Select
-                                  label="Category"
-                                  options={[
-                                    { label: 'General', value: 'general' },
-                                    { label: 'API', value: 'api' },
-                                    { label: 'Billing', value: 'billing' },
-                                    { label: 'Features', value: 'features' },
-                                    { label: 'Limits', value: 'limits' }
-                                  ]}
-                                  value={setting.category}
-                                  onChange={(value) => updateBulkSetting(index, 'category', value)}
-                                />
-                              </InlineStack>
-                            </BlockStack>
-                          </Card>
-                        ))}
-                      </BlockStack>
-                    </BlockStack>
-                  ) : (
-                    <BlockStack gap="400">
-                      <InlineStack align="space-between">
-                        <Text as="h2" variant="headingMd">
-                          {currentCategory === 'all' ? 'All Settings' : `${currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1)} Settings`}
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {currentSettings.length} settings
-                        </Text>
-                      </InlineStack>
-
-                      {currentSettings.length === 0 ? (
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          No settings in this category
-                        </Text>
-                      ) : (
-                        <DataTable
-                          columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text']}
-                          headings={['Key', 'Value', 'Category', 'Description', 'Encrypted', 'Actions']}
-                          rows={currentSettings.map(setting => [
-                            <Text key={`key-${setting.key}`} as="span" variant="bodyMd" fontWeight="bold">
-                              {setting.key}
-                            </Text>,
-                            <Text key={`value-${setting.key}`} as="span" variant="bodySm">
-                              {setting.isEncrypted 
-                                ? '••••••••' 
-                                : (setting.value.length > 50 
-                                    ? setting.value.substring(0, 50) + '...' 
-                                    : setting.value)
-                              }
-                            </Text>,
-                            getCategoryBadge(setting.category),
-                            <Text key={`desc-${setting.key}`} as="span" variant="bodySm" tone="subdued">
-                              {setting.description || '-'}
-                            </Text>,
-                            setting.isEncrypted ? (
-                              <Badge tone="critical">Yes</Badge>
-                            ) : (
-                              <Badge tone="subdued">No</Badge>
-                            ),
-                            <ButtonGroup key={`actions-${setting.key}`}>
-                              <Button size="slim" onClick={() => openSettingModal(setting)}>
-                                Edit
-                              </Button>
-                              <Button 
-                                size="slim" 
-                                tone="critical" 
-                                onClick={() => deleteSetting(setting.key)}
-                              >
-                                Delete
-                              </Button>
-                            </ButtonGroup>
-                          ])}
-                        />
-                      )}
-                    </BlockStack>
-                  )}
+      {/* Settings by Category */}
+      {categories.length === 0 ? (
+        <div style={{ 
+          textAlign: "center", 
+          padding: "40px", 
+          color: "#666",
+          fontStyle: "italic"
+        }}>
+          No settings found. Click "Reset All Settings to Defaults" to initialize.
+        </div>
+      ) : (
+        categories.map((category) => (
+          <div key={category} style={{ marginBottom: "30px" }}>
+            <h2 style={{ 
+              fontSize: "18px", 
+              fontWeight: "600", 
+              marginBottom: "15px",
+              textTransform: "capitalize",
+              color: "#333"
+            }}>
+              {category.replace('_', ' ')} Settings
+            </h2>
+            
+            <div style={{ 
+              backgroundColor: "white", 
+              border: "1px solid #e1e1e1", 
+              borderRadius: "8px",
+              overflow: "hidden"
+            }}>
+              {settings[category].map((setting, index) => (
+                <div 
+                  key={setting.key} 
+                  style={{ 
+                    padding: "20px",
+                    borderBottom: index < settings[category].length - 1 ? "1px solid #f1f1f1" : "none"
+                  }}
+                >
+                  <div style={{ marginBottom: "10px" }}>
+                    <label style={{ 
+                      fontWeight: "500", 
+                      fontSize: "14px",
+                      display: "block",
+                      marginBottom: "5px"
+                    }}>
+                      {setting.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </label>
+                    {setting.description && (
+                      <p style={{ 
+                        fontSize: "12px", 
+                        color: "#666", 
+                        marginBottom: "10px" 
+                      }}>
+                        {setting.description}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    {setting.isEncrypted ? (
+                      <input
+                        type="password"
+                        defaultValue={setting.value}
+                        placeholder="Enter value..."
+                        onBlur={(e) => {
+                          if (e.target.value !== setting.value) {
+                            handleUpdateSetting(setting.key, e.target.value, setting.description, setting.category);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          border: "1px solid #ddd",
+                          borderRadius: "4px",
+                          fontSize: "14px"
+                        }}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        defaultValue={setting.value}
+                        placeholder="Enter value..."
+                        onBlur={(e) => {
+                          if (e.target.value !== setting.value) {
+                            handleUpdateSetting(setting.key, e.target.value, setting.description, setting.category);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          border: "1px solid #ddd",
+                          borderRadius: "4px",
+                          fontSize: "14px"
+                        }}
+                      />
+                    )}
+                    
+                    {setting.isEncrypted && (
+                      <span style={{
+                        padding: "2px 8px",
+                        backgroundColor: "#fff3cd",
+                        color: "#856404",
+                        fontSize: "11px",
+                        borderRadius: "12px",
+                        fontWeight: "500"
+                      }}>
+                        Encrypted
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </Tabs>
-            </Card>
-          </BlockStack>
-        </Layout.Section>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
 
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="500">
-            {/* Quick Actions */}
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">Quick Actions</Text>
-                
-                <BlockStack gap="200">
-                  <Button fullWidth onClick={() => openSettingModal()}>
-                    Add New Setting
-                  </Button>
-                  
-                  <Button fullWidth onClick={initializeDefaultSettings}>
-                    Reset to Defaults
-                  </Button>
-                  
-                  <Button fullWidth onClick={() => {
-                    // Export functionality
-                    const dataStr = JSON.stringify(data.settings, null, 2);
-                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-                    const url = URL.createObjectURL(dataBlob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = 'settings-export.json';
-                    link.click();
-                  }}>
-                    Export Settings
-                  </Button>
-                </BlockStack>
-              </BlockStack>
-            </Card>
-
-            {/* Settings Categories */}
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">Categories</Text>
-                
-                <BlockStack gap="200">
-                  {data.categories.map(category => (
-                    <InlineStack key={category} align="space-between">
-                      <Text as="span" variant="bodySm">
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </Text>
-                      <Badge tone="subdued">
-                        {data.groupedSettings[category]?.length || 0}
-                      </Badge>
-                    </InlineStack>
-                  ))}
-                </BlockStack>
-              </BlockStack>
-            </Card>
-
-            {/* Security Notice */}
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">Security Notice</Text>
-                
-                <Text as="p" variant="bodySm">
-                  🔒 Encrypted settings are stored securely and never displayed in plain text.
-                </Text>
-                
-                <Text as="p" variant="bodySm">
-                  ⚠️ API keys and sensitive data should always be marked as encrypted.
-                </Text>
-                
-                <Text as="p" variant="bodySm">
-                  📝 Changes to settings may require application restart to take effect.
-                </Text>
-              </BlockStack>
-            </Card>
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
-
-      {/* Setting Edit Modal */}
-      <Modal
-        open={showSettingModal}
-        onClose={closeSettingModal}
-        title={editingSetting?.id ? "Edit Setting" : "Add New Setting"}
-        primaryAction={{
-          content: "Save Setting",
-          onAction: saveSetting,
-          loading: fetcher.state === "submitting"
-        }}
-        secondaryActions={[
-          {
-            content: "Cancel",
-            onAction: closeSettingModal
-          }
-        ]}
-      >
-        <Modal.Section>
-          {editingSetting && (
-            <BlockStack gap="400">
-              <TextField
-                label="Key"
-                value={editingSetting.key}
-                onChange={(value) => setEditingSetting({...editingSetting, key: value})}
-                disabled={!!editingSetting.id}
-                placeholder="e.g., openai_api_key"
-                autoComplete="off"
-              />
-              
-              <TextField
-                label="Value"
-                value={editingSetting.value}
-                onChange={(value) => setEditingSetting({...editingSetting, value: value})}
-                type={editingSetting.isEncrypted ? "password" : "text"}
-                multiline={!editingSetting.isEncrypted ? 3 : undefined}
-                placeholder="Enter the setting value"
-                autoComplete="off"
-              />
-              
-              <Select
-                label="Category"
-                options={[
-                  { label: 'General', value: 'general' },
-                  { label: 'API', value: 'api' },
-                  { label: 'Billing', value: 'billing' },
-                  { label: 'Features', value: 'features' },
-                  { label: 'Limits', value: 'limits' }
-                ]}
-                value={editingSetting.category}
-                onChange={(value) => setEditingSetting({...editingSetting, category: value})}
-              />
-              
-              <TextField
-                label="Description"
-                value={editingSetting.description || ''}
-                onChange={(value) => setEditingSetting({...editingSetting, description: value})}
-                placeholder="Describe what this setting controls"
-                autoComplete="off"
-              />
-              
-              <Checkbox
-                label="Encrypt this setting (for sensitive data like API keys)"
-                checked={editingSetting.isEncrypted}
-                onChange={(checked) => setEditingSetting({...editingSetting, isEncrypted: checked})}
-              />
-            </BlockStack>
-          )}
-        </Modal.Section>
-      </Modal>
-    </Page>
+      {/* System Information */}
+      <div style={{ marginTop: "40px" }}>
+        <h2 style={{ 
+          fontSize: "18px", 
+          fontWeight: "600", 
+          marginBottom: "15px",
+          color: "#333"
+        }}>
+          System Information
+        </h2>
+        
+        <div style={{ 
+          backgroundColor: "white", 
+          border: "1px solid #e1e1e1", 
+          borderRadius: "8px",
+          padding: "20px"
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "15px" }}>
+            <div>
+              <strong style={{ fontSize: "14px" }}>Application:</strong>
+              <div style={{ color: "#666", fontSize: "14px" }}>Facebook AI Ads Pro v1.0.0</div>
+            </div>
+            <div>
+              <strong style={{ fontSize: "14px" }}>Environment:</strong>
+              <div style={{ color: "#666", fontSize: "14px" }}>Production</div>
+            </div>
+            <div>
+              <strong style={{ fontSize: "14px" }}>Database:</strong>
+              <div style={{ color: "#666", fontSize: "14px" }}>SQLite</div>
+            </div>
+            <div>
+              <strong style={{ fontSize: "14px" }}>Server:</strong>
+              <div style={{ color: "#666", fontSize: "14px" }}>Ubuntu VPS</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
