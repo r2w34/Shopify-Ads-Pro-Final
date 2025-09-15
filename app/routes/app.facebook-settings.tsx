@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import React from "react";
 import { authenticate } from "../shopify.server";
 import { db } from "../db.server";
 import {
@@ -14,6 +15,7 @@ import {
   InlineStack,
   Layout
 } from "@shopify/polaris";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Parent route (app.tsx) handles authentication, so we can safely call authenticate here
@@ -46,10 +48,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function FacebookSettings() {
   const { shop, isConnected, facebookAccount } = useLoaderData<typeof loader>();
+  const app = useAppBridge();
+
+  // Handle messages from popup window
+  React.useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'FACEBOOK_AUTH_SUCCESS') {
+        // Refresh the page to show updated connection status
+        window.location.reload();
+      } else if (event.data.type === 'FACEBOOK_AUTH_ERROR') {
+        console.error('Facebook auth error:', event.data.error);
+        // You could show a toast notification here
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const handleConnectFacebook = () => {
-    // Redirect to Facebook OAuth
-    window.location.href = '/auth/facebook';
+    // Use App Bridge to handle external redirect properly in embedded app
+    const facebookAuthUrl = `/auth/facebook`;
+    
+    // Open in a new window/tab to avoid iframe restrictions
+    window.open(facebookAuthUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
   };
 
   return (
