@@ -1,0 +1,363 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+model FacebookAccount {
+  id                String    @id @default(cuid())
+  shop              String
+  facebookUserId    String
+  accessToken       String
+  businessId        String?
+  adAccountId       String?
+  pageId            String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  campaigns         Campaign[]
+  adAccounts        AdAccount[]
+  pages             FacebookPage[]
+  
+  @@unique([shop, facebookUserId])
+}
+
+model AdAccount {
+  id                String          @id @default(cuid())
+  facebookAccountId String
+  facebookAccount   FacebookAccount @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+  adAccountId       String
+  name              String
+  currency          String
+  timezone          String?
+  accountStatus     Int             @default(1)
+  isDefault         Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@unique([facebookAccountId, adAccountId])
+}
+
+model FacebookPage {
+  id                String          @id @default(cuid())
+  facebookAccountId String
+  facebookAccount   FacebookAccount @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+  pageId            String
+  name              String
+  accessToken       String
+  category          String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  instagramAccounts InstagramAccount[]
+  
+  @@unique([facebookAccountId, pageId])
+}
+
+model InstagramAccount {
+  id                String       @id @default(cuid())
+  facebookPageId    String
+  facebookPage      FacebookPage @relation(fields: [facebookPageId], references: [id], onDelete: Cascade)
+  instagramId       String
+  name              String?
+  username          String
+  profilePictureUrl String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  @@unique([facebookPageId, instagramId])
+}
+
+model Campaign {
+  id                String    @id @default(cuid())
+  shop              String
+  facebookAccountId String
+  facebookAccount   FacebookAccount @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+  
+  // Campaign details
+  name              String
+  objective         String    // CONVERSIONS, TRAFFIC, AWARENESS, etc.
+  status            String    @default("PAUSED") // ACTIVE, PAUSED, DELETED
+  budget            Float?
+  budgetType        String?   // DAILY, LIFETIME
+  adAccountId       String?   // Selected ad account ID
+  currency          String?   // Campaign currency
+  
+  // Facebook Campaign ID
+  facebookCampaignId String?
+  
+  // Product targeting
+  productIds        String?   // JSON array of Shopify product IDs
+  
+  // AI-generated content
+  adCopy            String?
+  headline          String?
+  description       String?
+  
+  // Performance metrics
+  impressions       Int       @default(0)
+  clicks            Int       @default(0)
+  conversions       Int       @default(0)
+  spend             Float     @default(0)
+  revenue           Float     @default(0)
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastSyncAt        DateTime?
+  
+  adSets            AdSet[]
+  ads               Ad[]
+  
+  @@unique([shop, facebookCampaignId])
+}
+
+model AdSet {
+  id                String    @id @default(cuid())
+  campaignId        String
+  campaign          Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  name              String
+  status            String    @default("PAUSED")
+  budget            Float?
+  budgetType        String?
+  
+  // Facebook AdSet ID
+  facebookAdSetId   String?
+  
+  // Targeting
+  targetingAge      String?   // "18-65"
+  targetingGender   String?   // "all", "male", "female"
+  targetingCountries String?  // JSON array
+  targetingInterests String?  // JSON array
+  
+  // Performance
+  impressions       Int       @default(0)
+  clicks            Int       @default(0)
+  conversions       Int       @default(0)
+  spend             Float     @default(0)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  ads               Ad[]
+}
+
+model Ad {
+  id                String    @id @default(cuid())
+  campaignId        String
+  campaign          Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  adSetId           String
+  adSet             AdSet     @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  
+  name              String
+  status            String    @default("PAUSED")
+  
+  // Facebook Ad ID
+  facebookAdId      String?
+  
+  // Creative content
+  headline          String?
+  primaryText       String?
+  description       String?
+  imageUrl          String?
+  linkUrl           String?
+  callToAction      String?   // SHOP_NOW, LEARN_MORE, etc.
+  
+  // Performance
+  impressions       Int       @default(0)
+  clicks            Int       @default(0)
+  conversions       Int       @default(0)
+  spend             Float     @default(0)
+  ctr               Float     @default(0)
+  cpc               Float     @default(0)
+  cpm               Float     @default(0)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model AIPrompt {
+  id                String    @id @default(cuid())
+  shop              String
+  type              String    // "headline", "description", "ad_copy"
+  prompt            String
+  response          String?
+  productId         String?
+  campaignId        String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model SubscriptionPlan {
+  id                String    @id @default(cuid())
+  name              String
+  description       String?
+  price             Float
+  currency          String    @default("USD")
+  interval          String    // "monthly", "yearly"
+  features          String    // JSON array of features
+  
+  // Limits
+  maxCampaigns      Int       @default(-1) // -1 for unlimited
+  maxAIRequests     Int       @default(-1)
+  maxFacebookAccounts Int     @default(1)
+  
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  subscriptions     Subscription[]
+}
+
+model Subscription {
+  id                String    @id @default(cuid())
+  shop              String    @unique
+  planId            String
+  plan              SubscriptionPlan @relation(fields: [planId], references: [id])
+  
+  status            String    @default("active") // active, cancelled, expired, trial
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd Boolean   @default(false)
+  
+  // Shopify billing
+  shopifyChargeId   String?
+  shopifyBillingId  String?
+  
+  // Usage tracking
+  campaignsUsed     Int       @default(0)
+  aiRequestsUsed    Int       @default(0)
+  
+  // Trial
+  trialStart        DateTime?
+  trialEnd          DateTime?
+  isTrialActive     Boolean   @default(false)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  usageLogs         UsageLog[]
+}
+
+model UsageLog {
+  id                String    @id @default(cuid())
+  subscriptionId    String
+  subscription      Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  
+  type              String    // "campaign_created", "ai_request", "facebook_sync"
+  description       String?
+  metadata          String?   // JSON data
+  
+  createdAt         DateTime  @default(now())
+}
+
+model AdminSettings {
+  id                String    @id @default(cuid())
+  key               String    @unique
+  value             String
+  description       String?
+  category          String    @default("general") // general, api, billing, features
+  isEncrypted       Boolean   @default(false)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Customer {
+  id                String    @id @default(cuid())
+  shop              String    @unique
+  shopName          String?
+  email             String?
+  ownerName         String?
+  
+  // Shopify store info
+  shopifyDomain     String?
+  shopifyPlan       String?
+  country           String?
+  timezone          String?
+  currency          String?
+  
+  // App usage
+  firstInstalled    DateTime  @default(now())
+  lastActive        DateTime  @default(now())
+  totalCampaigns    Int       @default(0)
+  totalSpend        Float     @default(0)
+  totalRevenue      Float     @default(0)
+  
+  // Status
+  isActive          Boolean   @default(true)
+  isBlocked         Boolean   @default(false)
+  blockReason       String?
+  
+  // Support
+  supportNotes      String?
+  supportPriority   String    @default("normal") // low, normal, high, urgent
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model AdminUser {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String
+  role              String    @default("admin") // super_admin, admin, support
+  
+  // Authentication
+  passwordHash      String
+  isActive          Boolean   @default(true)
+  lastLogin         DateTime?
+  
+  // Permissions
+  permissions       String    // JSON array of permissions
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  auditLogs         AuditLog[]
+}
+
+model AuditLog {
+  id                String    @id @default(cuid())
+  adminUserId       String?
+  adminUser         AdminUser? @relation(fields: [adminUserId], references: [id])
+  
+  action            String    // "customer_updated", "settings_changed", etc.
+  resource          String    // "customer", "settings", "subscription"
+  resourceId        String?
+  
+  oldValues         String?   // JSON
+  newValues         String?   // JSON
+  ipAddress         String?
+  userAgent         String?
+  
+  createdAt         DateTime  @default(now())
+}
