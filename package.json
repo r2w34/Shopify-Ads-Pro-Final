@@ -37,7 +37,7 @@
     "@shopify/shopify-app-remix": "^3.7.0",
     "@shopify/shopify-app-session-storage-prisma": "^6.0.0",
     "@tensorflow/tfjs-node": "^4.22.0",
-    "@types/bcryptjs": "^2.4.6",
+    "@types/bcryptjs": "^3.0.0",
     "axios": "^1.12.1",
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.4.5",
