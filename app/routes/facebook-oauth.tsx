@@ -31,10 +31,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
   }
   
-  const facebookAppId = process.env.FACEBOOK_APP_ID || "your-facebook-app-id";
+  const facebookAppId = process.env.FACEBOOK_APP_ID || "342313695281811";
   const redirectUri = process.env.NODE_ENV === 'development' 
-    ? process.env.LOCAL_FACEBOOK_REDIRECT_URI || "http://localhost:3000/auth/facebook/callback"
-    : process.env.FACEBOOK_REDIRECT_URI || "https://fbai-app.trustclouds.in/auth/facebook/callback";
+    ? process.env.LOCAL_FACEBOOK_REDIRECT_URI || "http://localhost:3000/facebook-callback"
+    : process.env.FACEBOOK_REDIRECT_URI || "https://fbai-app.trustclouds.in/facebook-callback";
   
   // Store shop in state for callback
   const state = btoa(JSON.stringify({ shop }));

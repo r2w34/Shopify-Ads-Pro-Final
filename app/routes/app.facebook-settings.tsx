@@ -67,8 +67,8 @@ export default function FacebookSettings() {
   }, []);
 
   const handleConnectFacebook = () => {
-    // Use App Bridge to handle external redirect properly in embedded app
-    const facebookAuthUrl = `/auth/facebook`;
+    // Use the new standalone Facebook OAuth route
+    const facebookAuthUrl = `/facebook-oauth?shop=${encodeURIComponent(shop)}`;
     
     // Open in a new window/tab to avoid iframe restrictions
     window.open(facebookAuthUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
