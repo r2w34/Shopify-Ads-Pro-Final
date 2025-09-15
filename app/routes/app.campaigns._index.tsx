@@ -119,7 +119,7 @@ export default function CampaignsList() {
           <Button 
             variant="primary" 
             icon={PlusIcon} 
-            url="/app/campaigns/new"
+            url="/app/campaigns/create"
             disabled={!data.facebookAccount.isConnected}
           >
             Create Campaign
@@ -159,7 +159,7 @@ export default function CampaignsList() {
                     heading="No campaigns yet"
                     action={{
                       content: "Create your first campaign",
-                      url: "/app/campaigns/new",
+                      url: "/app/campaigns/create",
                       disabled: !data.facebookAccount.isConnected,
                     }}
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"

@@ -35,7 +35,7 @@ export default function App() {
           Dashboard
         </Link>
         <Link to="/app/ai-dashboard">AI Dashboard</Link>
-        <Link to="/app/campaigns/new">Create Campaign</Link>
+        <Link to="/app/campaigns/create">Create Campaign</Link>
         <Link to="/app/campaigns">Campaigns</Link>
         <Link to="/app/analytics">Analytics</Link>
         <Link to="/app/performance-insights">AI Performance</Link>
