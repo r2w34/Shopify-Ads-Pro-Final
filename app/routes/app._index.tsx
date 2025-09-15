@@ -171,11 +171,11 @@ export default function Index() {
                     Create Campaign
                   </Button>
                 ) : (
-                  <Button variant="primary" url="/app/facebooksettings">
+                  <Button variant="primary" url="/app/facebook-settings">
                     Connect Facebook
                   </Button>
                 )}
-                <Button url="/app/facebooksettings">
+                <Button url="/app/facebook-settings">
                   Facebook Settings
                 </Button>
                 <Button url="/app/ai-dashboard/complex">
