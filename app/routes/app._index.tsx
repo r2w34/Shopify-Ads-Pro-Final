@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -14,14 +14,31 @@ import {
   Banner
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
+import { db } from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const { session } = await authenticate.admin(request);
+    const shop = session.shop;
+    
+    // Check Facebook connection status
+    const facebookAccount = await db.facebookAccount.findFirst({
+      where: { shop, isActive: true },
+      include: {
+        adAccounts: true,
+        pages: true
+      }
+    });
+
+    // Get URL parameters for error messages
+    const url = new URL(request.url);
+    const error = url.searchParams.get('error');
     
     return json({
       shop: session.shop,
       isAuthenticated: true,
+      facebookConnected: !!facebookAccount,
+      error,
       stats: {
         totalCampaigns: 0,
         activeCampaigns: 0,
@@ -38,6 +55,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return json({
       shop: 'unknown',
       isAuthenticated: false,
+      facebookConnected: false,
+      error: null,
       stats: {
         totalCampaigns: 0,
         activeCampaigns: 0,
@@ -75,12 +94,30 @@ export default function Index() {
   return (
     <Page title="FB AI Ads Pro Dashboard">
       <Layout>
+        {/* Error Banner */}
+        {data.error && (
+          <Layout.Section>
+            <Banner
+              title="Action Required"
+              status="warning"
+            >
+              {data.error === 'facebook_not_connected' && (
+                <p>Please connect your Facebook account first to create campaigns. Go to Facebook Settings to get started.</p>
+              )}
+            </Banner>
+          </Layout.Section>
+        )}
+
+        {/* Welcome Banner */}
         <Layout.Section>
           <Banner
             title="Welcome to FB AI Ads Pro!"
-            status="success"
+            status={data.facebookConnected ? "success" : "info"}
           >
             <p>Your AI-powered Facebook advertising optimization platform is ready for {data.shop}.</p>
+            {!data.facebookConnected && (
+              <p><strong>Next step:</strong> Connect your Facebook account to start creating campaigns.</p>
+            )}
           </Banner>
         </Layout.Section>
 
@@ -129,13 +166,19 @@ export default function Index() {
             <BlockStack gap="400">
               <Text variant="headingMd">Quick Actions</Text>
               <InlineStack gap="300">
-                <Button variant="primary" url="/app/campaigns/new">
-                  Create Campaign
-                </Button>
-                <Button url="/app/facebook-settings">
+                {data.facebookConnected ? (
+                  <Button variant="primary" url="/app/campaigns/new">
+                    Create Campaign
+                  </Button>
+                ) : (
+                  <Button variant="primary" url="/app/facebooksettings">
+                    Connect Facebook
+                  </Button>
+                )}
+                <Button url="/app/facebooksettings">
                   Facebook Settings
                 </Button>
-                <Button url="/app/ai-dashboard">
+                <Button url="/app/ai-dashboard/complex">
                   AI Dashboard
                 </Button>
                 <Button url="/app/analytics">
