@@ -11,12 +11,18 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  
-  return json({
-    apiKey: process.env.SHOPIFY_API_KEY || "",
-    shop: admin.rest.session.shop,
-  });
+  try {
+    const { admin, session } = await authenticate.admin(request);
+    
+    return json({
+      apiKey: process.env.SHOPIFY_API_KEY || "",
+      shop: session.shop,
+    });
+  } catch (error) {
+    console.error('Authentication error:', error);
+    // Let Shopify handle the authentication error
+    throw error;
+  }
 };
 
 export default function App() {
