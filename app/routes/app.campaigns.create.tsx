@@ -30,7 +30,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { db } from "../db.server";
-import { FacebookAdsService, CAMPAIGN_OBJECTIVES, OPTIMIZATION_GOALS, BILLING_EVENTS } from "../services/facebook-ads.server";
+import { FacebookAdsService, CAMPAIGN_OBJECTIVES, OPTIMIZATION_GOALS, BILLING_EVENTS, SPECIAL_AD_CATEGORIES } from "../services/facebook-ads.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
@@ -200,6 +200,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (action === "create_campaign") {
     const campaignName = formData.get("campaignName") as string;
     const objective = formData.get("objective") as string;
+    const specialAdCategory = formData.get("specialAdCategory") as string;
     const budget = parseFloat(formData.get("budget") as string);
     const budgetType = formData.get("budgetType") as string;
     const selectedAdAccount = formData.get("selectedAdAccount") as string;
@@ -278,6 +279,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Campaign level
           campaignName: campaignName,
           objective: objective,
+          specialAdCategory: specialAdCategory,
           
           // Ad Set level
           adSetName: `${campaignName} - Ad Set`,
@@ -361,6 +363,7 @@ export default function CreateCampaign() {
   // Form state
   const [campaignName, setCampaignName] = useState("");
   const [objective, setObjective] = useState("CONVERSIONS");
+  const [specialAdCategory, setSpecialAdCategory] = useState("NONE");
   const [budget, setBudget] = useState("50");
   const [budgetType, setBudgetType] = useState("DAILY");
   const [selectedAdAccount, setSelectedAdAccount] = useState(
@@ -461,6 +464,7 @@ export default function CreateCampaign() {
       action: "create_campaign",
       campaignName,
       objective,
+      specialAdCategory,
       budget,
       budgetType,
       selectedAdAccount,
@@ -515,6 +519,21 @@ export default function CreateCampaign() {
                 value={objective}
                 onChange={setObjective}
                 helpText="Choose what you want to achieve with this campaign"
+              />
+
+              <Select
+                label="Special Ad Category"
+                options={[
+                  { label: 'None (Standard ads)', value: 'NONE' },
+                  { label: 'Credit/Financial Services', value: 'CREDIT' },
+                  { label: 'Employment', value: 'EMPLOYMENT' },
+                  { label: 'Housing/Real Estate', value: 'HOUSING' },
+                  { label: 'Politics/Issues', value: 'ISSUES_ELECTIONS_POLITICS' },
+                  { label: 'Online Gambling/Gaming', value: 'ONLINE_GAMBLING_AND_GAMING' },
+                ]}
+                value={specialAdCategory}
+                onChange={setSpecialAdCategory}
+                helpText="Select if your ads fall into a special regulated category"
               />
 
               <Select

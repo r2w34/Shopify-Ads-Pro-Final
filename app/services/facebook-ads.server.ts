@@ -64,6 +64,46 @@ interface AdStatus {
   ARCHIVED: string;
 }
 
+// Facebook Marketing API Constants
+export const CAMPAIGN_OBJECTIVES = {
+  OUTCOME_AWARENESS: "OUTCOME_AWARENESS",
+  OUTCOME_TRAFFIC: "OUTCOME_TRAFFIC", 
+  OUTCOME_ENGAGEMENT: "OUTCOME_ENGAGEMENT",
+  OUTCOME_LEADS: "OUTCOME_LEADS",
+  OUTCOME_APP_PROMOTION: "OUTCOME_APP_PROMOTION",
+  OUTCOME_SALES: "OUTCOME_SALES"
+} as const;
+
+export const SPECIAL_AD_CATEGORIES = {
+  NONE: [],
+  CREDIT: ["CREDIT"],
+  EMPLOYMENT: ["EMPLOYMENT"],
+  HOUSING: ["HOUSING"],
+  ISSUES_ELECTIONS_POLITICS: ["ISSUES_ELECTIONS_POLITICS"],
+  ONLINE_GAMBLING_AND_GAMING: ["ONLINE_GAMBLING_AND_GAMING"]
+} as const;
+
+export const OPTIMIZATION_GOALS = {
+  IMPRESSIONS: "IMPRESSIONS",
+  REACH: "REACH",
+  LINK_CLICKS: "LINK_CLICKS",
+  LANDING_PAGE_VIEWS: "LANDING_PAGE_VIEWS",
+  OFFSITE_CONVERSIONS: "OFFSITE_CONVERSIONS",
+  CONVERSIONS: "CONVERSIONS",
+  APP_INSTALLS: "APP_INSTALLS",
+  LEAD_GENERATION: "LEAD_GENERATION",
+  THRUPLAY: "THRUPLAY",
+  VALUE: "VALUE"
+} as const;
+
+export const BILLING_EVENTS = {
+  IMPRESSIONS: "IMPRESSIONS",
+  CLICKS: "CLICKS",
+  LINK_CLICKS: "LINK_CLICKS",
+  APP_INSTALLS: "APP_INSTALLS",
+  THRUPLAY: "THRUPLAY"
+} as const;
+
 export class FacebookAdsService {
   private accessToken: string;
 
@@ -414,6 +454,7 @@ export class FacebookAdsService {
     // Campaign level
     campaignName: string;
     objective: string;
+    specialAdCategory?: string;
     
     // Ad Set level
     adSetName: string;
@@ -456,7 +497,10 @@ export class FacebookAdsService {
       const campaignResponse = await this.createCampaign(adAccountId, {
         name: campaignConfig.campaignName,
         objective: campaignConfig.objective,
-        status: "PAUSED" // Start paused for safety
+        status: "PAUSED", // Start paused for safety
+        special_ad_categories: campaignConfig.specialAdCategory && campaignConfig.specialAdCategory !== 'NONE' 
+          ? [campaignConfig.specialAdCategory] 
+          : [] // Required parameter - empty array for non-special ads
       });
 
       if (campaignResponse.error) {
@@ -607,36 +651,6 @@ export class FacebookAdsService {
 }
 
 // Export constants for use in other files
-export const CAMPAIGN_OBJECTIVES = {
-  OUTCOME_AWARENESS: "OUTCOME_AWARENESS",
-  OUTCOME_TRAFFIC: "OUTCOME_TRAFFIC", 
-  OUTCOME_ENGAGEMENT: "OUTCOME_ENGAGEMENT",
-  OUTCOME_LEADS: "OUTCOME_LEADS",
-  OUTCOME_APP_PROMOTION: "OUTCOME_APP_PROMOTION",
-  OUTCOME_SALES: "OUTCOME_SALES"
-};
-
-export const OPTIMIZATION_GOALS = {
-  IMPRESSIONS: "IMPRESSIONS",
-  REACH: "REACH",
-  LINK_CLICKS: "LINK_CLICKS",
-  LANDING_PAGE_VIEWS: "LANDING_PAGE_VIEWS",
-  OFFSITE_CONVERSIONS: "OFFSITE_CONVERSIONS",
-  CONVERSIONS: "CONVERSIONS",
-  APP_INSTALLS: "APP_INSTALLS",
-  LEAD_GENERATION: "LEAD_GENERATION",
-  THRUPLAY: "THRUPLAY",
-  VALUE: "VALUE"
-};
-
-export const BILLING_EVENTS = {
-  IMPRESSIONS: "IMPRESSIONS",
-  CLICKS: "CLICKS",
-  LINK_CLICKS: "LINK_CLICKS",
-  APP_INSTALLS: "APP_INSTALLS",
-  THRUPLAY: "THRUPLAY"
-};
-
 export const AD_STATUS = {
   ACTIVE: "ACTIVE",
   PAUSED: "PAUSED",
