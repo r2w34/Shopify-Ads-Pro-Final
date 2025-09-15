@@ -17,58 +17,39 @@ import { authenticate } from "../shopify.server";
 import { db } from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
-    
-    // Check Facebook connection status
-    const facebookAccount = await db.facebookAccount.findFirst({
-      where: { shop, isActive: true },
-      include: {
-        adAccounts: true,
-        pages: true
-      }
-    });
+  // Parent route (app.tsx) handles authentication, so we can safely call authenticate here
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  
+  // Check Facebook connection status
+  const facebookAccount = await db.facebookAccount.findFirst({
+    where: { shop, isActive: true },
+    include: {
+      adAccounts: true,
+      pages: true
+    }
+  });
 
-    // Get URL parameters for error messages
-    const url = new URL(request.url);
-    const error = url.searchParams.get('error');
-    
-    return json({
-      shop: session.shop,
-      isAuthenticated: true,
-      facebookConnected: !!facebookAccount,
-      error,
-      stats: {
-        totalCampaigns: 0,
-        activeCampaigns: 0,
-        totalRevenue: 156780,
-        roas: 6.8,
-        conversionRate: 4.7,
-        audienceReach: 285000,
-        aiOptimizations: 147,
-        costSavings: 23450
-      }
-    });
-  } catch (error) {
-    console.error('Dashboard loader error:', error);
-    return json({
-      shop: 'unknown',
-      isAuthenticated: false,
-      facebookConnected: false,
-      error: null,
-      stats: {
-        totalCampaigns: 0,
-        activeCampaigns: 0,
-        totalRevenue: 0,
-        roas: 0,
-        conversionRate: 0,
-        audienceReach: 0,
-        aiOptimizations: 0,
-        costSavings: 0
-      }
-    });
-  }
+  // Get URL parameters for error messages
+  const url = new URL(request.url);
+  const error = url.searchParams.get('error');
+  
+  return json({
+    shop: session.shop,
+    isAuthenticated: true,
+    facebookConnected: !!facebookAccount,
+    error,
+    stats: {
+      totalCampaigns: 0,
+      activeCampaigns: 0,
+      totalRevenue: 156780,
+      roas: 6.8,
+      conversionRate: 4.7,
+      audienceReach: 285000,
+      aiOptimizations: 147,
+      costSavings: 23450
+    }
+  });
 };
 
 export default function Index() {
