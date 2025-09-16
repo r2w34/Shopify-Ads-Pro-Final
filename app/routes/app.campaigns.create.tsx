@@ -143,9 +143,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         
         const demoAdCopy = {
           primaryText: `🚀 Discover ${product.title}! ${targetAudience ? `Perfect for ${targetAudience.toLowerCase()}.` : ''} ${product.description ? product.description.substring(0, 100) + '...' : 'Amazing quality and value.'} Shop now and transform your experience!`,
-          headline: `${product.title} - ${objective === 'CONVERSIONS' ? 'Buy Now' : objective === 'TRAFFIC' ? 'Learn More' : 'Discover More'}`,
+          headline: `${product.title} - ${objective === 'OUTCOME_SALES' ? 'Buy Now' : objective === 'OUTCOME_TRAFFIC' ? 'Learn More' : objective === 'OUTCOME_LEADS' ? 'Get Started' : 'Discover More'}`,
           description: `${product.price ? `Starting at ${product.price}` : 'Great value'} | Free shipping available | ${tone === 'urgent' ? 'Limited time offer!' : tone === 'friendly' ? 'We\'d love to help you!' : 'Premium quality guaranteed'}`,
-          callToAction: objective === 'CONVERSIONS' ? 'Shop Now' : objective === 'TRAFFIC' ? 'Learn More' : 'See More'
+          callToAction: objective === 'OUTCOME_SALES' ? 'Shop Now' : objective === 'OUTCOME_TRAFFIC' ? 'Learn More' : objective === 'OUTCOME_LEADS' ? 'Sign Up' : 'See More'
         };
         
         return json({ success: true, adCopy: demoAdCopy, isDemoMode: true });
@@ -207,6 +207,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const currency = formData.get("currency") as string;
     const productIds = formData.get("productIds") as string;
     const adCopy = formData.get("adCopy") as string;
+    const mediaType = formData.get("mediaType") as string;
+    const mediaCount = parseInt(formData.get("mediaCount") as string || "0");
+    const placements = formData.get("placements") as string;
+    const targetAudience = formData.get("targetAudience") as string;
+    const tone = formData.get("tone") as string;
 
     try {
       // Get Facebook account with access token
@@ -283,7 +288,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           
           // Ad Set level
           adSetName: `${campaignName} - Ad Set`,
-          optimizationGoal: objective === "OUTCOME_TRAFFIC" ? "LINK_CLICKS" : "CONVERSIONS",
+          optimizationGoal: getOptimizationGoal(objective),
           billingEvent: "LINK_CLICKS",
           dailyBudget: budgetType === "DAILY" ? Math.round(budget * 100) : undefined, // Convert to cents
           lifetimeBudget: budgetType === "LIFETIME" ? Math.round(budget * 100) : undefined,
@@ -358,11 +363,11 @@ export default function CreateCampaign() {
   
   // Multi-stage state
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
   
   // Form state
   const [campaignName, setCampaignName] = useState("");
-  const [objective, setObjective] = useState("CONVERSIONS");
+  const [objective, setObjective] = useState("OUTCOME_SALES");
   const [specialAdCategory, setSpecialAdCategory] = useState("NONE");
   const [budget, setBudget] = useState("50");
   const [budgetType, setBudgetType] = useState("DAILY");
@@ -384,6 +389,13 @@ export default function CreateCampaign() {
   const [targetAudience, setTargetAudience] = useState("");
   const [tone, setTone] = useState("professional");
   const [generatedAdCopy, setGeneratedAdCopy] = useState<any>(null);
+  
+  // Media and placement state
+  const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
+  const [mediaType, setMediaType] = useState("single_image");
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>([
+    "facebook_feed", "instagram_feed"
+  ]);
   
   // UI state
   const [showSuccessToast, setShowSuccessToast] = useState(false);
@@ -413,16 +425,35 @@ export default function CreateCampaign() {
   }, [fetcher.data, navigate]);
 
   const objectiveOptions = [
-    { label: "Conversions", value: "CONVERSIONS" },
-    { label: "Traffic", value: "LINK_CLICKS" },
-    { label: "Brand Awareness", value: "BRAND_AWARENESS" },
-    { label: "Reach", value: "REACH" },
-    { label: "Engagement", value: "ENGAGEMENT" },
+    { label: "Sales (Conversions)", value: "OUTCOME_SALES" },
+    { label: "Traffic (Website Visits)", value: "OUTCOME_TRAFFIC" },
+    { label: "Leads (Lead Generation)", value: "OUTCOME_LEADS" },
+    { label: "Engagement (Post Engagement)", value: "OUTCOME_ENGAGEMENT" },
+    { label: "Brand Awareness", value: "OUTCOME_AWARENESS" },
+    { label: "App Promotion", value: "OUTCOME_APP_PROMOTION" },
   ];
 
   const budgetTypeOptions = [
     { label: "Daily Budget", value: "DAILY" },
     { label: "Lifetime Budget", value: "LIFETIME" },
+  ];
+
+  const mediaTypeOptions = [
+    { label: "Single Image", value: "single_image" },
+    { label: "Carousel Images", value: "carousel" },
+    { label: "Video", value: "video" },
+    { label: "Collection", value: "collection" },
+  ];
+
+  const placementOptions = [
+    { label: "Facebook Feed", value: "facebook_feed" },
+    { label: "Instagram Feed", value: "instagram_feed" },
+    { label: "Facebook Stories", value: "facebook_stories" },
+    { label: "Instagram Stories", value: "instagram_stories" },
+    { label: "Facebook Reels", value: "facebook_reels" },
+    { label: "Instagram Reels", value: "instagram_reels" },
+    { label: "Messenger", value: "messenger" },
+    { label: "Audience Network", value: "audience_network" },
   ];
 
   const toneOptions = [
@@ -431,6 +462,26 @@ export default function CreateCampaign() {
     { label: "Urgent", value: "urgent" },
     { label: "Friendly", value: "friendly" },
   ];
+
+  // Helper function to map objectives to optimization goals
+  const getOptimizationGoal = (objective: string) => {
+    switch (objective) {
+      case "OUTCOME_TRAFFIC":
+        return "LINK_CLICKS";
+      case "OUTCOME_SALES":
+        return "CONVERSIONS";
+      case "OUTCOME_LEADS":
+        return "LEAD_GENERATION";
+      case "OUTCOME_ENGAGEMENT":
+        return "POST_ENGAGEMENT";
+      case "OUTCOME_AWARENESS":
+        return "REACH";
+      case "OUTCOME_APP_PROMOTION":
+        return "APP_INSTALLS";
+      default:
+        return "CONVERSIONS";
+    }
+  };
 
   const handleProductSelection = (productId: string) => {
     setSelectedProducts(prev => 
@@ -471,6 +522,11 @@ export default function CreateCampaign() {
       currency,
       productIds: JSON.stringify(selectedProducts),
       adCopy: JSON.stringify(generatedAdCopy),
+      mediaType,
+      mediaCount: selectedMedia.length.toString(),
+      placements: selectedPlacements.join(','),
+      targetAudience,
+      tone,
     }, { method: "POST" });
   };
 
@@ -481,6 +537,8 @@ export default function CreateCampaign() {
       case 3:
         return selectedProducts.length > 0;
       case 4:
+        return selectedMedia.length > 0 && selectedPlacements.length > 0;
+      case 5:
         return targetAudience && tone;
       default:
         return true;
@@ -491,8 +549,9 @@ export default function CreateCampaign() {
     switch (step) {
       case 1: return "Campaign Setup";
       case 2: return "Product Selection";
-      case 3: return "Audience & Creative";
-      case 4: return "Review & Launch";
+      case 3: return "Media & Placements";
+      case 4: return "Audience & Creative";
+      case 5: return "Review & Launch";
       default: return "Campaign Creation";
     }
   };
@@ -644,6 +703,73 @@ export default function CreateCampaign() {
         return (
           <Card>
             <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Media & Placements</Text>
+              
+              <Select
+                label="Media Type"
+                options={mediaTypeOptions}
+                value={mediaType}
+                onChange={setMediaType}
+                helpText="Choose the type of media for your ads"
+              />
+
+              <div>
+                <Text as="p" variant="bodyMd" fontWeight="medium">Upload Media Files</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {mediaType === 'single_image' && 'Upload 1 image (JPG, PNG, max 30MB)'}
+                  {mediaType === 'carousel' && 'Upload 2-10 images for carousel (JPG, PNG, max 30MB each)'}
+                  {mediaType === 'video' && 'Upload 1 video (MP4, MOV, max 4GB)'}
+                  {mediaType === 'collection' && 'Upload 1 cover image + 4-50 product images'}
+                </Text>
+                <input
+                  type="file"
+                  multiple={mediaType === 'carousel' || mediaType === 'collection'}
+                  accept={mediaType === 'video' ? 'video/*' : 'image/*'}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setSelectedMedia(files);
+                  }}
+                  style={{ marginTop: '8px' }}
+                />
+                {selectedMedia.length > 0 && (
+                  <Text as="p" variant="bodySm" tone="success">
+                    {selectedMedia.length} file(s) selected
+                  </Text>
+                )}
+              </div>
+
+              <div>
+                <Text as="p" variant="bodyMd" fontWeight="medium">Ad Placements</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Choose where your ads will appear
+                </Text>
+                <BlockStack gap="200">
+                  {placementOptions.map((placement) => (
+                    <label key={placement.value} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedPlacements.includes(placement.value)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPlacements([...selectedPlacements, placement.value]);
+                          } else {
+                            setSelectedPlacements(selectedPlacements.filter(p => p !== placement.value));
+                          }
+                        }}
+                      />
+                      <Text as="span" variant="bodySm">{placement.label}</Text>
+                    </label>
+                  ))}
+                </BlockStack>
+              </div>
+            </BlockStack>
+          </Card>
+        );
+
+      case 4:
+        return (
+          <Card>
+            <BlockStack gap="400">
               <Text as="h2" variant="headingMd">Audience & Creative Settings</Text>
               
               <TextField
@@ -682,7 +808,7 @@ export default function CreateCampaign() {
           </Card>
         );
 
-      case 4:
+      case 5:
         return (
           <BlockStack gap="400">
             <Card>
@@ -705,6 +831,18 @@ export default function CreateCampaign() {
                   <InlineStack align="space-between">
                     <Text as="span" variant="bodySm">Products:</Text>
                     <Text as="span" variant="bodySm">{selectedProducts.length} selected</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm">Media Type:</Text>
+                    <Text as="span" variant="bodySm">{mediaTypeOptions.find(m => m.value === mediaType)?.label}</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm">Media Files:</Text>
+                    <Text as="span" variant="bodySm">{selectedMedia.length} file(s)</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm">Placements:</Text>
+                    <Text as="span" variant="bodySm">{selectedPlacements.length} selected</Text>
                   </InlineStack>
                 </BlockStack>
               </BlockStack>
