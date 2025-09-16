@@ -171,28 +171,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const tone = formData.get("tone") as string;
 
     try {
-      // Check if OpenAI API key is properly configured
-      const openaiApiKey = process.env.OPENAI_API_KEY;
-      if (!openaiApiKey || openaiApiKey.includes('demo') || openaiApiKey.includes('testing')) {
-        // Return demo ad copy when OpenAI is not configured
-        const product = {
-          title: formData.get("productTitle") as string,
-          description: formData.get("productDescription") as string,
-          price: formData.get("productPrice") as string,
-        };
-        
-        const demoAdCopy = {
-          primaryText: `🚀 Discover ${product.title}! ${targetAudience ? `Perfect for ${targetAudience.toLowerCase()}.` : ''} ${product.description ? product.description.substring(0, 100) + '...' : 'Amazing quality and value.'} Shop now and transform your experience!`,
-          headline: `${product.title} - ${objective === 'OUTCOME_SALES' ? 'Buy Now' : objective === 'OUTCOME_TRAFFIC' ? 'Learn More' : objective === 'OUTCOME_LEADS' ? 'Get Started' : 'Discover More'}`,
-          description: `${product.price ? `Starting at ${product.price}` : 'Great value'} | Free shipping available | ${tone === 'urgent' ? 'Limited time offer!' : tone === 'friendly' ? 'We\'d love to help you!' : 'Premium quality guaranteed'}`,
-          callToAction: objective === 'OUTCOME_SALES' ? 'Shop Now' : objective === 'OUTCOME_TRAFFIC' ? 'Learn More' : objective === 'OUTCOME_LEADS' ? 'Sign Up' : 'See More'
-        };
-        
-        return json({ success: true, adCopy: demoAdCopy, isDemoMode: true });
-      }
-
-      const { OpenAIService } = await import("../services/openai.server");
-      const openaiService = new OpenAIService();
+      // Use Gemini AI for content generation
+      const { GeminiService } = await import("../services/gemini.server");
+      const geminiService = new GeminiService();
 
       // Get product details (simplified for demo)
       const product = {
@@ -203,7 +184,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         tags: (formData.get("productTags") as string)?.split(',') || [],
       };
 
-      const adCopy = await openaiService.generateAdCopy({
+      const adCopy = await geminiService.generateAdCopy({
         product,
         objective,
         targetAudience,
@@ -214,13 +195,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (error: any) {
       console.error("Ad copy generation error:", error);
       
-      // Fallback to demo ad copy on error
-      const product = {
-        title: formData.get("productTitle") as string,
-        description: formData.get("productDescription") as string,
-        price: formData.get("productPrice") as string,
-      };
-      
+      // Simple fallback ad copy on error
       const fallbackAdCopy = {
         primaryText: `✨ ${product.title} - ${targetAudience ? `Perfect for ${targetAudience.toLowerCase()}` : 'Amazing product'}! ${product.description ? product.description.substring(0, 80) + '...' : 'High quality and great value.'} Don't miss out!`,
         headline: `${product.title} - Special Offer`,
@@ -230,9 +205,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       
       return json({ 
         success: true, 
-        adCopy: fallbackAdCopy, 
-        isDemoMode: true,
-        message: "Using demo ad copy (OpenAI not configured)" 
+        adCopy: fallbackAdCopy,
+        message: "Using fallback ad copy (AI service error)" 
       });
     }
   }
@@ -960,17 +934,7 @@ export default function CreateCampaign() {
                 </BlockStack>
               </Card>
 
-              {/* Demo Mode Banner */}
-              {(fetcher.data?.isDemoMode || process.env.NODE_ENV === 'development') && (
-                <Banner
-                  title="Demo Mode Active"
-                  status="info"
-                >
-                  <Text as="p" variant="bodyMd">
-                    AI ad copy generation is using demo content. Configure OpenAI API key for full functionality.
-                  </Text>
-                </Banner>
-              )}
+
 
               {/* Step Content */}
               {renderStepContent()}

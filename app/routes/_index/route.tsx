@@ -54,7 +54,7 @@ export default function App() {
               help you make informed decisions before launching campaigns.
             </li>
             <li>
-              <strong>🎨 AI Content Generation</strong>. OpenAI-powered ad copy and creative 
+              <strong>🎨 AI Content Generation</strong>. Gemini AI-powered ad copy and creative 
               suggestions that convert better and engage your target audience.
             </li>
             <li>

@@ -222,7 +222,9 @@ export class FacebookAdsService {
       name: campaignData.name,
       objective: campaignData.objective,
       status: campaignData.status || "PAUSED",
-      buying_type: campaignData.buying_type || "AUCTION"
+      buying_type: campaignData.buying_type || "AUCTION",
+      // special_ad_categories is now required by Facebook API
+      special_ad_categories: campaignData.special_ad_categories || []
     };
 
     // Add optional fields only if they have valid values
@@ -248,10 +250,6 @@ export class FacebookAdsService {
     
     if (campaignData.end_time) {
       data.end_time = campaignData.end_time;
-    }
-    
-    if (campaignData.special_ad_categories && campaignData.special_ad_categories.length > 0) {
-      data.special_ad_categories = campaignData.special_ad_categories;
     }
 
     return this.makeRequest(`/act_${adAccountId}/campaigns`, "POST", data);

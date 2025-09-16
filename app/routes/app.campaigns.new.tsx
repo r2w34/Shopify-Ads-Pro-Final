@@ -128,10 +128,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const tone = formData.get("tone") as string;
 
     try {
-      const { OpenAIService } = await import("../services/openai.server");
-      const openaiService = new OpenAIService();
+      const { GeminiService } = await import("../services/gemini.server");
+      const geminiService = new GeminiService();
 
-      // Get product details (simplified for demo)
+      // Get product details
       const product = {
         id: productId,
         title: formData.get("productTitle") as string,
@@ -140,7 +140,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         tags: (formData.get("productTags") as string)?.split(',') || [],
       };
 
-      const adCopy = await openaiService.generateAdCopy({
+      const adCopy = await geminiService.generateAdCopy({
         product,
         objective,
         targetAudience,
@@ -215,6 +215,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           status: "PAUSED",
           budget,
           budgetType,
+          special_ad_categories: [] // Required by Facebook API
         });
 
         // Update campaign with Facebook ID

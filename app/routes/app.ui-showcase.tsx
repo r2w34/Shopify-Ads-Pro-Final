@@ -436,7 +436,7 @@ export default function UIShowcase() {
                                 onAction: () => console.log("Configure API")
                               }}
                             >
-                              <p>OpenAI API key is missing. AI features will not work without proper configuration.</p>
+                              <p>Gemini API key is missing. AI features will not work without proper configuration.</p>
                             </Banner>
 
                             <Banner
