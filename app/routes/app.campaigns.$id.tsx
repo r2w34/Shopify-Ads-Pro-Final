@@ -216,14 +216,12 @@ export default function CampaignDetail() {
   });
 
   const objectiveOptions = [
-    { label: 'Traffic', value: 'LINK_CLICKS' },
-    { label: 'Conversions', value: 'CONVERSIONS' },
-    { label: 'Brand Awareness', value: 'BRAND_AWARENESS' },
-    { label: 'Reach', value: 'REACH' },
-    { label: 'Engagement', value: 'ENGAGEMENT' },
-    { label: 'App Installs', value: 'APP_INSTALLS' },
-    { label: 'Video Views', value: 'VIDEO_VIEWS' },
-    { label: 'Lead Generation', value: 'LEAD_GENERATION' },
+    { label: 'Sales', value: 'OUTCOME_SALES' },
+    { label: 'Traffic', value: 'OUTCOME_TRAFFIC' },
+    { label: 'Leads', value: 'OUTCOME_LEADS' },
+    { label: 'Engagement', value: 'OUTCOME_ENGAGEMENT' },
+    { label: 'Awareness', value: 'OUTCOME_AWARENESS' },
+    { label: 'App Promotion', value: 'OUTCOME_APP_PROMOTION' },
   ];
 
   const adAccountOptions = data.facebookAccounts.map(account => ({

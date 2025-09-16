@@ -256,7 +256,7 @@ export default function NewCampaign() {
   const navigate = useNavigate();
   
   const [campaignName, setCampaignName] = useState("");
-  const [objective, setObjective] = useState("CONVERSIONS");
+  const [objective, setObjective] = useState("OUTCOME_SALES");
   const [budget, setBudget] = useState("50");
   const [budgetType, setBudgetType] = useState("DAILY");
   const [selectedAdAccount, setSelectedAdAccount] = useState(
@@ -289,11 +289,12 @@ export default function NewCampaign() {
   }, [fetcher.data]);
 
   const objectiveOptions = [
-    { label: "Conversions", value: "CONVERSIONS" },
-    { label: "Traffic", value: "LINK_CLICKS" },
-    { label: "Brand Awareness", value: "BRAND_AWARENESS" },
-    { label: "Reach", value: "REACH" },
-    { label: "Engagement", value: "ENGAGEMENT" },
+    { label: "Sales", value: "OUTCOME_SALES" },
+    { label: "Traffic", value: "OUTCOME_TRAFFIC" },
+    { label: "Leads", value: "OUTCOME_LEADS" },
+    { label: "Engagement", value: "OUTCOME_ENGAGEMENT" },
+    { label: "Awareness", value: "OUTCOME_AWARENESS" },
+    { label: "App Promotion", value: "OUTCOME_APP_PROMOTION" },
   ];
 
   const budgetTypeOptions = [

@@ -227,7 +227,7 @@ export class AIFunnelService {
     // Bottom of Funnel - Conversion (20% budget)
     stages.push({
       name: 'Conversion - Hot Audiences',
-      objective: 'CONVERSIONS',
+      objective: 'OUTCOME_SALES',
       audienceType: 'hot',
       budget: totalBudget * 0.2,
       budgetPercentage: 20,
@@ -347,7 +347,7 @@ export class AIFunnelService {
       },
       {
         name: 'Conversion - Hot Traffic',
-        objective: 'CONVERSIONS',
+        objective: 'OUTCOME_SALES',
         audienceType: 'hot',
         budget: totalBudget * 0.2,
         budgetPercentage: 20,

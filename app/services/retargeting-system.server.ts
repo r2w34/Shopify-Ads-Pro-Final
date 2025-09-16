@@ -632,13 +632,13 @@ export class RetargetingSystemService {
     switch (type) {
       case 'initiated_checkout':
       case 'add_to_cart':
-        return 'CONVERSIONS';
+        return 'OUTCOME_SALES';
       case 'viewed_product':
-        return 'TRAFFIC';
+        return 'OUTCOME_TRAFFIC';
       case 'website_visitors':
-        return 'REACH';
+        return 'OUTCOME_AWARENESS';
       default:
-        return 'CONVERSIONS';
+        return 'OUTCOME_SALES';
     }
   }
 
