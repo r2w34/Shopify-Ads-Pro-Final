@@ -289,7 +289,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Ad Set level
           adSetName: `${campaignName} - Ad Set`,
           optimizationGoal: getOptimizationGoal(objective),
-          billingEvent: "LINK_CLICKS",
+          billingEvent: getBillingEvent(objective),
           dailyBudget: budgetType === "DAILY" ? Math.round(budget * 100) : undefined, // Convert to cents
           lifetimeBudget: budgetType === "LIFETIME" ? Math.round(budget * 100) : undefined,
           targeting: {
@@ -469,7 +469,7 @@ export default function CreateCampaign() {
       case "OUTCOME_TRAFFIC":
         return "LINK_CLICKS";
       case "OUTCOME_SALES":
-        return "CONVERSIONS";
+        return "OFFSITE_CONVERSIONS";
       case "OUTCOME_LEADS":
         return "LEAD_GENERATION";
       case "OUTCOME_ENGAGEMENT":
@@ -479,7 +479,27 @@ export default function CreateCampaign() {
       case "OUTCOME_APP_PROMOTION":
         return "APP_INSTALLS";
       default:
-        return "CONVERSIONS";
+        return "OFFSITE_CONVERSIONS";
+    }
+  };
+
+  // Helper function to map objectives to billing events
+  const getBillingEvent = (objective: string) => {
+    switch (objective) {
+      case "OUTCOME_TRAFFIC":
+        return "LINK_CLICKS";
+      case "OUTCOME_SALES":
+        return "IMPRESSIONS";
+      case "OUTCOME_LEADS":
+        return "IMPRESSIONS";
+      case "OUTCOME_ENGAGEMENT":
+        return "IMPRESSIONS";
+      case "OUTCOME_AWARENESS":
+        return "IMPRESSIONS";
+      case "OUTCOME_APP_PROMOTION":
+        return "IMPRESSIONS";
+      default:
+        return "IMPRESSIONS";
     }
   };
 

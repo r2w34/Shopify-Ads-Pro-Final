@@ -339,7 +339,7 @@ export class FacebookAdsService {
       targeting: adSetData.targeting,
       status: 'PAUSED', // Always create paused for review
       billing_event: 'IMPRESSIONS',
-      optimization_goal: 'LINK_CLICKS',
+      optimization_goal: adSetData.optimizationGoal || 'OFFSITE_CONVERSIONS',
       ...(adSetData.budget && adSetData.budgetType === 'DAILY' && {
         daily_budget: Math.round(adSetData.budget * 100)
       }),

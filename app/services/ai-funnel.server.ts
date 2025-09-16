@@ -181,7 +181,7 @@ export class AIFunnelService {
     // Top of Funnel - Awareness (50% budget)
     stages.push({
       name: 'Awareness - Cold Audiences',
-      objective: 'REACH',
+      objective: 'OUTCOME_AWARENESS',
       audienceType: 'cold',
       budget: totalBudget * 0.5,
       budgetPercentage: 50,
@@ -307,7 +307,7 @@ export class AIFunnelService {
     return [
       {
         name: 'Awareness - Cold Traffic',
-        objective: 'REACH',
+        objective: 'OUTCOME_AWARENESS',
         audienceType: 'cold',
         budget: totalBudget * 0.5,
         budgetPercentage: 50,

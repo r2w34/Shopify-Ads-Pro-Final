@@ -231,7 +231,7 @@ export class GeminiService {
       "stages": [
         {
           "name": "Awareness Stage",
-          "objective": "REACH",
+          "objective": "OUTCOME_AWARENESS",
           "budgetPercentage": 50,
           "audienceType": "cold",
           "targeting": {
