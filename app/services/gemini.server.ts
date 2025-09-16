@@ -1,9 +1,9 @@
 import axios from "axios";
 
 // Gemini API configuration
-const GEMINI_API_KEY = "AIzaSyCOLsr0_ADY0Lsgs1Vl9TZattNpLBwyGlQ";
-const GEMINI_TEXT_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
-const GEMINI_VISION_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
+const GEMINI_API_KEY = "AIzaSyDSCsILpx3Glg4wtZq0o7U2NImP2JM9kn4";
+const GEMINI_TEXT_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const GEMINI_VISION_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 export interface GeminiResponse {
   text: string;
