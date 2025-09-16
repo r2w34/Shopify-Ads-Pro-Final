@@ -521,34 +521,34 @@ export default function CreateCampaign() {
 
     fetcher.submit({
       action: "generate_ad_copy",
-      productId: selectedProduct.id,
-      productTitle: selectedProduct.title,
+      productId: selectedProduct.id || "",
+      productTitle: selectedProduct.title || "",
       productDescription: selectedProduct.description || "",
-      productPrice: selectedProduct.priceRangeV2.minVariantPrice.amount,
-      productTags: selectedProduct.tags.join(','),
-      objective,
-      targetAudience,
-      tone,
+      productPrice: selectedProduct.priceRangeV2?.minVariantPrice?.amount || "0",
+      productTags: (selectedProduct.tags || []).join(','),
+      objective: objective || "OUTCOME_SALES",
+      targetAudience: targetAudience || "",
+      tone: tone || "professional",
     }, { method: "POST" });
   };
 
   const createCampaign = () => {
     fetcher.submit({
       action: "create_campaign",
-      campaignName,
-      objective,
-      specialAdCategory,
-      budget,
-      budgetType,
-      selectedAdAccount,
-      currency,
-      productIds: JSON.stringify(selectedProducts),
-      adCopy: JSON.stringify(generatedAdCopy),
-      mediaType,
-      mediaCount: selectedMedia.length.toString(),
-      placements: selectedPlacements.join(','),
-      targetAudience,
-      tone,
+      campaignName: campaignName || "",
+      objective: objective || "OUTCOME_SALES",
+      specialAdCategory: specialAdCategory || "NONE",
+      budget: budget || "50",
+      budgetType: budgetType || "DAILY",
+      selectedAdAccount: selectedAdAccount || "",
+      currency: currency || "USD",
+      productIds: JSON.stringify(selectedProducts || []),
+      adCopy: JSON.stringify(generatedAdCopy || {}),
+      mediaType: mediaType || "single_image",
+      mediaCount: (selectedMedia?.length || 0).toString(),
+      placements: (selectedPlacements || []).join(','),
+      targetAudience: targetAudience || "",
+      tone: tone || "professional",
     }, { method: "POST" });
   };
 
