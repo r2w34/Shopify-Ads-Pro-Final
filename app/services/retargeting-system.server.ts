@@ -103,7 +103,7 @@ export interface CampaignSchedule {
 
 export interface OptimizationSettings {
   bidStrategy: 'lowest_cost' | 'cost_cap' | 'bid_cap' | 'target_cost';
-  optimizationGoal: 'conversions' | 'link_clicks' | 'impressions' | 'reach';
+  optimizationGoal: 'OFFSITE_CONVERSIONS' | 'LINK_CLICKS' | 'IMPRESSIONS' | 'REACH';
   autoOptimization: boolean;
   budgetOptimization: boolean;
   creativeRotation: boolean;
@@ -333,7 +333,7 @@ export class RetargetingSystemService {
       },
       optimization: {
         bidStrategy: 'lowest_cost',
-        optimizationGoal: 'conversions',
+        optimizationGoal: 'OFFSITE_CONVERSIONS',
         autoOptimization: true,
         budgetOptimization: true,
         creativeRotation: true,
