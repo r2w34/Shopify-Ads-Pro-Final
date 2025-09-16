@@ -32,6 +32,46 @@ import { authenticate } from "../shopify.server";
 import { db } from "../db.server";
 import { FacebookAdsService, CAMPAIGN_OBJECTIVES, OPTIMIZATION_GOALS, BILLING_EVENTS, SPECIAL_AD_CATEGORIES } from "../services/facebook-ads.server";
 
+// Helper function to map objectives to optimization goals
+const getOptimizationGoal = (objective: string) => {
+  switch (objective) {
+    case "OUTCOME_TRAFFIC":
+      return "LINK_CLICKS";
+    case "OUTCOME_SALES":
+      return "OFFSITE_CONVERSIONS";
+    case "OUTCOME_LEADS":
+      return "LEAD_GENERATION";
+    case "OUTCOME_ENGAGEMENT":
+      return "POST_ENGAGEMENT";
+    case "OUTCOME_AWARENESS":
+      return "REACH";
+    case "OUTCOME_APP_PROMOTION":
+      return "APP_INSTALLS";
+    default:
+      return "OFFSITE_CONVERSIONS";
+  }
+};
+
+// Helper function to map objectives to billing events
+const getBillingEvent = (objective: string) => {
+  switch (objective) {
+    case "OUTCOME_TRAFFIC":
+      return "LINK_CLICKS";
+    case "OUTCOME_SALES":
+      return "IMPRESSIONS";
+    case "OUTCOME_LEADS":
+      return "IMPRESSIONS";
+    case "OUTCOME_ENGAGEMENT":
+      return "IMPRESSIONS";
+    case "OUTCOME_AWARENESS":
+      return "IMPRESSIONS";
+    case "OUTCOME_APP_PROMOTION":
+      return "IMPRESSIONS";
+    default:
+      return "IMPRESSIONS";
+  }
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
@@ -463,45 +503,7 @@ export default function CreateCampaign() {
     { label: "Friendly", value: "friendly" },
   ];
 
-  // Helper function to map objectives to optimization goals
-  const getOptimizationGoal = (objective: string) => {
-    switch (objective) {
-      case "OUTCOME_TRAFFIC":
-        return "LINK_CLICKS";
-      case "OUTCOME_SALES":
-        return "OFFSITE_CONVERSIONS";
-      case "OUTCOME_LEADS":
-        return "LEAD_GENERATION";
-      case "OUTCOME_ENGAGEMENT":
-        return "POST_ENGAGEMENT";
-      case "OUTCOME_AWARENESS":
-        return "REACH";
-      case "OUTCOME_APP_PROMOTION":
-        return "APP_INSTALLS";
-      default:
-        return "OFFSITE_CONVERSIONS";
-    }
-  };
 
-  // Helper function to map objectives to billing events
-  const getBillingEvent = (objective: string) => {
-    switch (objective) {
-      case "OUTCOME_TRAFFIC":
-        return "LINK_CLICKS";
-      case "OUTCOME_SALES":
-        return "IMPRESSIONS";
-      case "OUTCOME_LEADS":
-        return "IMPRESSIONS";
-      case "OUTCOME_ENGAGEMENT":
-        return "IMPRESSIONS";
-      case "OUTCOME_AWARENESS":
-        return "IMPRESSIONS";
-      case "OUTCOME_APP_PROMOTION":
-        return "IMPRESSIONS";
-      default:
-        return "IMPRESSIONS";
-    }
-  };
 
   const handleProductSelection = (productId: string) => {
     setSelectedProducts(prev => 
