@@ -25,6 +25,7 @@
     "node": "^18.20 || ^20.10 || >=21.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.62.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.2.1",
     "@remix-run/dev": "^2.16.1",
@@ -42,9 +43,12 @@
     "axios": "^1.12.1",
     "bcryptjs": "^3.0.2",
     "chart.js": "^4.5.0",
+    "compression": "^1.8.1",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
+    "express-rate-limit": "^8.1.0",
     "facebook-nodejs-business-sdk": "^20.0.3",
+    "helmet": "^8.1.0",
     "isbot": "^5.1.0",
     "nodemailer": "^7.0.6",
     "openai": "^4.104.0",
@@ -53,6 +57,9 @@
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.2.0",
     "recharts": "^3.2.0",
+    "redis": "^5.8.2",
+    "sharp": "^0.34.3",
+    "socket.io": "^4.8.1",
     "vite-tsconfig-paths": "^5.0.1"
   },
   "devDependencies": {

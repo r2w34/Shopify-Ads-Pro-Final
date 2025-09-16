@@ -26,6 +26,7 @@ import {
   ProgressBar,
   Toast,
   Frame,
+  RadioButton,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -33,6 +34,7 @@ import { db } from "../db.server";
 import { FacebookAdsService, CAMPAIGN_OBJECTIVES, OPTIMIZATION_GOALS, BILLING_EVENTS, SPECIAL_AD_CATEGORIES } from "../services/facebook-ads.server";
 import { AudienceSuggestionsService, type AudienceSuggestion } from "../services/audience-suggestions.server";
 import { StoreMediaService, type StoreMedia } from "../services/store-media.server";
+import { getFacebookAdsLibraryService, type AdLibraryAd } from "../services/facebook-ads-library.server";
 
 // Helper function to map objectives to optimization goals
 const getOptimizationGoal = (objective: string) => {
@@ -240,6 +242,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const placements = formData.get("placements") as string;
     const targetAudience = formData.get("targetAudience") as string;
     const tone = formData.get("tone") as string;
+    const campaignStatus = formData.get("campaignStatus") as string || "PAUSED";
 
     try {
       // Get Facebook account with access token
@@ -299,7 +302,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           currency: currency,
           productIds,
           adCopy,
-          status: "PAUSED", // Start paused for review
+          status: campaignStatus, // Use selected status
         }
       });
 
@@ -313,6 +316,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           campaignName: campaignName,
           objective: objective,
           specialAdCategory: specialAdCategory,
+          status: campaignStatus,
           
           // Ad Set level
           adSetName: `${campaignName} - Ad Set`,
@@ -396,7 +400,7 @@ export default function CreateCampaign() {
   
   // Multi-stage state
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 6;
+  const totalSteps = 7;
   
   // Form state
   const [campaignName, setCampaignName] = useState("");
@@ -440,6 +444,14 @@ export default function CreateCampaign() {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  
+  // Ads Library state
+  const [showAdsLibraryModal, setShowAdsLibraryModal] = useState(false);
+  const [adsLibraryResults, setAdsLibraryResults] = useState<AdLibraryAd[]>([]);
+  const [adsLibraryLoading, setAdsLibraryLoading] = useState(false);
+  
+  // Campaign launch state
+  const [campaignStatus, setCampaignStatus] = useState<'ACTIVE' | 'PAUSED'>('PAUSED');
   
   const isLoading = ["loading", "submitting"].includes(fetcher.state);
 
@@ -531,11 +543,61 @@ export default function CreateCampaign() {
     }, { method: "POST" });
   };
 
+  const searchAdsLibrary = async (keywords: string) => {
+    setAdsLibraryLoading(true);
+    try {
+      const response = await fetch('/app/ads-library', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'search_keywords',
+          keywords: keywords,
+          country: 'US',
+          mediaType: 'ALL',
+          limit: '10'
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setAdsLibraryResults(result.ads || []);
+      } else {
+        console.error('Ads library search failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Ads library search error:', error);
+    } finally {
+      setAdsLibraryLoading(false);
+    }
+  };
+
+  const copyAdText = (text: string, field: 'primaryText' | 'headline' | 'description') => {
+    if (!generatedAdCopy) {
+      setGeneratedAdCopy({
+        primaryText: '',
+        headline: '',
+        description: ''
+      });
+    }
+    
+    setGeneratedAdCopy((prev: any) => ({
+      ...prev,
+      [field]: text
+    }));
+    
+    setShowAdsLibraryModal(false);
+    setToastMessage(`${field} copied from ads library!`);
+    setShowSuccessToast(true);
+  };
+
   const createCampaign = () => {
     fetcher.submit({
       action: "create_campaign",
       campaignName: campaignName || "",
       objective: objective || "OUTCOME_SALES",
+      campaignStatus: campaignStatus,
       specialAdCategory: specialAdCategory || "NONE",
       budget: budget || "50",
       budgetType: budgetType || "DAILY",
@@ -563,6 +625,8 @@ export default function CreateCampaign() {
         return (selectedMedia.length > 0 || selectedStoreMedia.length > 0) && selectedPlacements.length > 0;
       case 6:
         return targetAudience && tone;
+      case 7:
+        return generatedAdCopy !== null; // Preview must be generated
       default:
         return true;
     }
@@ -575,7 +639,8 @@ export default function CreateCampaign() {
       case 3: return "Target Audience";
       case 4: return "Media & Placements";
       case 5: return "Creative Settings";
-      case 6: return "Review & Launch";
+      case 6: return "Ad Preview";
+      case 7: return "Review & Launch";
       default: return "Campaign Creation";
     }
   };
@@ -906,11 +971,268 @@ export default function CreateCampaign() {
                   helpText="Optional: Select Instagram account for cross-platform advertising"
                 />
               )}
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h3" variant="bodyMd" fontWeight="bold">Ad Inspiration</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Search Facebook Ads Library for inspiration from similar products or competitors
+                  </Text>
+                  
+                  <ButtonGroup>
+                    <Button 
+                      onClick={() => {
+                        const productKeywords = selectedProducts.length > 0 
+                          ? data.products.find(p => p.id === selectedProducts[0])?.title || ''
+                          : '';
+                        if (productKeywords) {
+                          searchAdsLibrary(productKeywords);
+                          setShowAdsLibraryModal(true);
+                        }
+                      }}
+                      disabled={selectedProducts.length === 0}
+                    >
+                      Find Similar Product Ads
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => {
+                        const industryKeywords = targetAudience || 'ecommerce products';
+                        searchAdsLibrary(industryKeywords);
+                        setShowAdsLibraryModal(true);
+                      }}
+                    >
+                      Browse Industry Ads
+                    </Button>
+                  </ButtonGroup>
+                </BlockStack>
+              </Card>
             </BlockStack>
           </Card>
         );
 
       case 6:
+        return (
+          <BlockStack gap="400">
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">Ad Preview</Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Preview how your ads will appear on Facebook and Instagram
+                </Text>
+
+                {generatedAdCopy ? (
+                  <BlockStack gap="400">
+                    {/* Facebook Feed Preview */}
+                    <Card>
+                      <BlockStack gap="300">
+                        <Text as="h3" variant="bodyMd" fontWeight="bold">Facebook Feed</Text>
+                        <div style={{ 
+                          border: '1px solid #e1e3e5', 
+                          borderRadius: '8px', 
+                          padding: '16px',
+                          backgroundColor: '#f8f9fa',
+                          maxWidth: '500px'
+                        }}>
+                          <BlockStack gap="200">
+                            <InlineStack gap="200">
+                              <div style={{ 
+                                width: '40px', 
+                                height: '40px', 
+                                borderRadius: '50%', 
+                                backgroundColor: '#1877f2',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                              }}>
+                                {data.pages[0]?.name?.charAt(0) || 'S'}
+                              </div>
+                              <BlockStack gap="50">
+                                <Text as="span" variant="bodySm" fontWeight="bold">
+                                  {data.pages[0]?.name || 'Your Store'}
+                                </Text>
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  Sponsored
+                                </Text>
+                              </BlockStack>
+                            </InlineStack>
+                            
+                            <Text as="p" variant="bodyMd">
+                              {generatedAdCopy.primaryText}
+                            </Text>
+                            
+                            {(selectedStoreMedia.length > 0 || selectedMedia.length > 0) && (
+                              <div style={{
+                                width: '100%',
+                                height: '200px',
+                                backgroundColor: '#e1e3e5',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#6b7280'
+                              }}>
+                                {selectedStoreMedia.length > 0 ? (
+                                  <img 
+                                    src={selectedStoreMedia[0].url} 
+                                    alt="Ad media"
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      borderRadius: '4px'
+                                    }}
+                                  />
+                                ) : (
+                                  <Text as="span" variant="bodySm">Your selected media</Text>
+                                )}
+                              </div>
+                            )}
+                            
+                            <div style={{
+                              border: '1px solid #e1e3e5',
+                              borderRadius: '4px',
+                              padding: '12px',
+                              backgroundColor: 'white'
+                            }}>
+                              <BlockStack gap="100">
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  {new URL(`https://${data.shop}`).hostname.toUpperCase()}
+                                </Text>
+                                <Text as="span" variant="bodyMd" fontWeight="bold">
+                                  {generatedAdCopy.headline}
+                                </Text>
+                                <Text as="span" variant="bodySm">
+                                  {generatedAdCopy.description}
+                                </Text>
+                              </BlockStack>
+                            </div>
+                            
+                            <InlineStack gap="200">
+                              <Button size="small" variant="primary">
+                                Shop Now
+                              </Button>
+                              <Button size="small" variant="plain">
+                                Like
+                              </Button>
+                              <Button size="small" variant="plain">
+                                Comment
+                              </Button>
+                              <Button size="small" variant="plain">
+                                Share
+                              </Button>
+                            </InlineStack>
+                          </BlockStack>
+                        </div>
+                      </BlockStack>
+                    </Card>
+
+                    {/* Instagram Feed Preview */}
+                    <Card>
+                      <BlockStack gap="300">
+                        <Text as="h3" variant="bodyMd" fontWeight="bold">Instagram Feed</Text>
+                        <div style={{ 
+                          border: '1px solid #e1e3e5', 
+                          borderRadius: '8px', 
+                          padding: '16px',
+                          backgroundColor: '#f8f9fa',
+                          maxWidth: '400px'
+                        }}>
+                          <BlockStack gap="200">
+                            <InlineStack gap="200" align="space-between">
+                              <InlineStack gap="200">
+                                <div style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  borderRadius: '50%', 
+                                  backgroundColor: '#e1306c',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'white',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }}>
+                                  {data.pages[0]?.name?.charAt(0) || 'S'}
+                                </div>
+                                <BlockStack gap="50">
+                                  <Text as="span" variant="bodySm" fontWeight="bold">
+                                    {data.pages[0]?.name || 'Your Store'}
+                                  </Text>
+                                  <Text as="span" variant="bodySm" tone="subdued">
+                                    Sponsored
+                                  </Text>
+                                </BlockStack>
+                              </InlineStack>
+                              <Text as="span" variant="bodySm">•••</Text>
+                            </InlineStack>
+                            
+                            {(selectedStoreMedia.length > 0 || selectedMedia.length > 0) && (
+                              <div style={{
+                                width: '100%',
+                                height: '300px',
+                                backgroundColor: '#e1e3e5',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#6b7280'
+                              }}>
+                                {selectedStoreMedia.length > 0 ? (
+                                  <img 
+                                    src={selectedStoreMedia[0].url} 
+                                    alt="Ad media"
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      borderRadius: '4px'
+                                    }}
+                                  />
+                                ) : (
+                                  <Text as="span" variant="bodySm">Your selected media</Text>
+                                )}
+                              </div>
+                            )}
+                            
+                            <BlockStack gap="100">
+                              <Text as="p" variant="bodyMd">
+                                <Text as="span" fontWeight="bold">{data.pages[0]?.name || 'Your Store'}</Text>{' '}
+                                {generatedAdCopy.primaryText}
+                              </Text>
+                              <Text as="span" variant="bodySm" tone="subdued">
+                                View all comments
+                              </Text>
+                            </BlockStack>
+                            
+                            <InlineStack gap="200">
+                              <Button size="small" variant="plain">♥</Button>
+                              <Button size="small" variant="plain">💬</Button>
+                              <Button size="small" variant="plain">📤</Button>
+                            </InlineStack>
+                          </BlockStack>
+                        </div>
+                      </BlockStack>
+                    </Card>
+
+                    <Banner tone="info">
+                      <p>This is a preview of how your ads will appear. The actual appearance may vary slightly based on Facebook's rendering.</p>
+                    </Banner>
+                  </BlockStack>
+                ) : (
+                  <Banner tone="warning">
+                    <p>Please generate ad copy in the previous step to see the preview.</p>
+                  </Banner>
+                )}
+              </BlockStack>
+            </Card>
+          </BlockStack>
+        );
+
+      case 7:
         return (
           <BlockStack gap="400">
             <Card>
@@ -981,6 +1303,28 @@ export default function CreateCampaign() {
                     
                     <Text as="h3" variant="bodyMd" fontWeight="bold">Description:</Text>
                     <Text as="p" variant="bodyMd">{generatedAdCopy.description}</Text>
+                  </BlockStack>
+                  
+                  <Divider />
+                  
+                  <BlockStack gap="300">
+                    <Text as="h3" variant="bodyMd" fontWeight="bold">Campaign Launch Settings</Text>
+                    <RadioButton
+                      label="Start campaign immediately (ACTIVE)"
+                      helpText="Campaign will start running and spending budget immediately"
+                      checked={campaignStatus === 'ACTIVE'}
+                      id="active"
+                      name="campaignStatus"
+                      onChange={() => setCampaignStatus('ACTIVE')}
+                    />
+                    <RadioButton
+                      label="Create campaign as paused (PAUSED)"
+                      helpText="Campaign will be created but won't start running until you manually activate it"
+                      checked={campaignStatus === 'PAUSED'}
+                      id="paused"
+                      name="campaignStatus"
+                      onChange={() => setCampaignStatus('PAUSED')}
+                    />
                   </BlockStack>
                   
                   <Button
@@ -1240,6 +1584,147 @@ export default function CreateCampaign() {
                 );
               }}
             />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      {/* Facebook Ads Library Modal */}
+      <Modal
+        open={showAdsLibraryModal}
+        onClose={() => setShowAdsLibraryModal(false)}
+        title="Facebook Ads Library - Ad Inspiration"
+        large
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              Browse successful ads from Facebook Ads Library and copy text for your campaign.
+            </Text>
+            
+            {adsLibraryLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <Spinner size="large" />
+                <Text as="p" variant="bodyMd">Searching Facebook Ads Library...</Text>
+              </div>
+            ) : adsLibraryResults.length > 0 ? (
+              <ResourceList
+                resourceName={{ singular: 'ad', plural: 'ads' }}
+                items={adsLibraryResults}
+                renderItem={(ad) => (
+                  <ResourceItem
+                    id={ad.id}
+                    accessibilityLabel={`View ad from ${ad.page_name}`}
+                  >
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between">
+                        <Text as="h3" variant="bodyMd" fontWeight="bold">
+                          {ad.page_name || 'Unknown Page'}
+                        </Text>
+                        {ad.publisher_platforms && (
+                          <InlineStack gap="100">
+                            {ad.publisher_platforms.map((platform, index) => (
+                              <Badge key={index} tone="info" size="small">
+                                {platform}
+                              </Badge>
+                            ))}
+                          </InlineStack>
+                        )}
+                      </InlineStack>
+                      
+                      {/* Ad Copy Sections */}
+                      {(ad.ad_creative_link_title || ad.ad_creative_link_titles?.[0]) && (
+                        <div>
+                          <InlineStack align="space-between">
+                            <Text as="span" variant="bodySm" fontWeight="bold">Headline:</Text>
+                            <Button 
+                              size="micro" 
+                              onClick={() => copyAdText(
+                                ad.ad_creative_link_title || ad.ad_creative_link_titles?.[0] || '', 
+                                'headline'
+                              )}
+                            >
+                              Copy Headline
+                            </Button>
+                          </InlineStack>
+                          <Text as="p" variant="bodySm">
+                            {ad.ad_creative_link_title || ad.ad_creative_link_titles?.[0]}
+                          </Text>
+                        </div>
+                      )}
+                      
+                      {(ad.ad_creative_body || ad.ad_creative_bodies?.[0]) && (
+                        <div>
+                          <InlineStack align="space-between">
+                            <Text as="span" variant="bodySm" fontWeight="bold">Primary Text:</Text>
+                            <Button 
+                              size="micro" 
+                              onClick={() => copyAdText(
+                                ad.ad_creative_body || ad.ad_creative_bodies?.[0] || '', 
+                                'primaryText'
+                              )}
+                            >
+                              Copy Text
+                            </Button>
+                          </InlineStack>
+                          <Text as="p" variant="bodySm">
+                            {(ad.ad_creative_body || ad.ad_creative_bodies?.[0] || '').substring(0, 200)}
+                            {(ad.ad_creative_body || ad.ad_creative_bodies?.[0] || '').length > 200 ? '...' : ''}
+                          </Text>
+                        </div>
+                      )}
+                      
+                      {(ad.ad_creative_link_description || ad.ad_creative_link_descriptions?.[0]) && (
+                        <div>
+                          <InlineStack align="space-between">
+                            <Text as="span" variant="bodySm" fontWeight="bold">Description:</Text>
+                            <Button 
+                              size="micro" 
+                              onClick={() => copyAdText(
+                                ad.ad_creative_link_description || ad.ad_creative_link_descriptions?.[0] || '', 
+                                'description'
+                              )}
+                            >
+                              Copy Description
+                            </Button>
+                          </InlineStack>
+                          <Text as="p" variant="bodySm">
+                            {ad.ad_creative_link_description || ad.ad_creative_link_descriptions?.[0]}
+                          </Text>
+                        </div>
+                      )}
+                      
+                      {/* Performance Data */}
+                      <InlineStack gap="300">
+                        {ad.impressions && (
+                          <Text as="span" variant="bodySm" tone="subdued">
+                            Impressions: {ad.impressions.lower_bound} - {ad.impressions.upper_bound}
+                          </Text>
+                        )}
+                        {ad.spend && (
+                          <Text as="span" variant="bodySm" tone="subdued">
+                            Spend: ${ad.spend.lower_bound} - ${ad.spend.upper_bound}
+                          </Text>
+                        )}
+                      </InlineStack>
+                      
+                      {ad.ad_snapshot_url && (
+                        <Button 
+                          url={ad.ad_snapshot_url} 
+                          external 
+                          size="small"
+                        >
+                          View Full Ad
+                        </Button>
+                      )}
+                    </BlockStack>
+                  </ResourceItem>
+                )}
+              />
+            ) : (
+              <Banner tone="info">
+                <p>No ads found. Try different keywords or search terms.</p>
+              </Banner>
+            )}
           </BlockStack>
         </Modal.Section>
       </Modal>

@@ -627,4 +627,129 @@ export class FacebookAdsService {
       throw new Error('Failed to create system user');
     }
   }
+
+  // Complete campaign creation method
+  async createCompleteCampaign(adAccountId: string, campaignData: {
+    // Campaign level
+    campaignName: string;
+    objective: string;
+    specialAdCategory?: string;
+    status?: string;
+    
+    // Ad Set level
+    adSetName: string;
+    optimizationGoal: string;
+    billingEvent: string;
+    dailyBudget?: number;
+    lifetimeBudget?: number;
+    targeting: any;
+    
+    // Creative level
+    creativeName: string;
+    adCopy: any;
+    linkUrl: string;
+    pageId: string;
+    instagramActorId?: string;
+    
+    // Ad level
+    adName: string;
+  }): Promise<{
+    success: boolean;
+    campaign?: any;
+    adSet?: any;
+    creative?: any;
+    ad?: any;
+    error?: string;
+  }> {
+    try {
+      console.log('🚀 Starting complete campaign creation...');
+      
+      // Step 1: Create Campaign
+      console.log('📝 Creating campaign...');
+      const campaignId = await this.createCampaign({
+        name: campaignData.campaignName,
+        objective: campaignData.objective,
+        special_ad_categories: campaignData.specialAdCategory ? [campaignData.specialAdCategory] : [],
+        status: campaignData.status || 'PAUSED' // Use provided status or default to paused
+      });
+
+      // Step 2: Create Ad Set
+      console.log('🎯 Creating ad set...');
+      const adSetId = await this.createAdSet({
+        name: campaignData.adSetName,
+        campaign_id: campaignId,
+        optimization_goal: campaignData.optimizationGoal,
+        billing_event: campaignData.billingEvent,
+        daily_budget: campaignData.dailyBudget,
+        lifetime_budget: campaignData.lifetimeBudget,
+        targeting: campaignData.targeting,
+        status: campaignData.status || 'PAUSED'
+      });
+
+      // Step 3: Create Ad Creative
+      console.log('🎨 Creating ad creative...');
+      const creativeResponse = await this.makeApiCall(
+        `https://graph.facebook.com/v18.0/act_${this.adAccountId}/adcreatives`,
+        'POST',
+        {
+          name: campaignData.creativeName,
+          object_story_spec: {
+            page_id: campaignData.pageId,
+            link_data: {
+              link: campaignData.linkUrl,
+              message: campaignData.adCopy.primaryText || 'Check out our amazing products!',
+              name: campaignData.adCopy.headline || 'Shop Now',
+              description: campaignData.adCopy.description || 'Limited time offer - don\'t miss out!',
+              call_to_action: {
+                type: 'SHOP_NOW',
+                value: {
+                  link: campaignData.linkUrl
+                }
+              }
+            }
+          },
+          ...(campaignData.instagramActorId && {
+            instagram_actor_id: campaignData.instagramActorId
+          })
+        }
+      );
+
+      const creativeId = creativeResponse.id;
+
+      // Step 4: Create Ad
+      console.log('📢 Creating ad...');
+      const adId = await this.createAd({
+        name: campaignData.adName,
+        adset_id: adSetId,
+        creative: { creative_id: creativeId },
+        status: campaignData.status || 'PAUSED'
+      });
+
+      console.log('✅ Complete campaign created successfully!');
+      
+      return {
+        success: true,
+        campaign: { id: campaignId },
+        adSet: { id: adSetId },
+        creative: { id: creativeId },
+        ad: { id: adId }
+      };
+
+    } catch (error: any) {
+      console.error('❌ Complete campaign creation failed:', error);
+      
+      let errorMessage = 'Campaign creation failed';
+      if (error.response?.data?.error) {
+        const fbError = error.response.data.error;
+        errorMessage = this.formatErrorMessage(fbError.code, fbError.message);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
 }
