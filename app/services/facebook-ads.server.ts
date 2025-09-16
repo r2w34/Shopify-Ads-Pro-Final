@@ -144,10 +144,14 @@ export class FacebookAdsService {
       
       if (data) {
         Object.keys(data).forEach(key => {
-          if (typeof data[key] === "object") {
-            body.append(key, JSON.stringify(data[key]));
-          } else {
-            body.append(key, data[key]);
+          const value = data[key];
+          // Skip undefined, null, or empty values
+          if (value !== undefined && value !== null && value !== '') {
+            if (typeof value === "object") {
+              body.append(key, JSON.stringify(value));
+            } else {
+              body.append(key, String(value));
+            }
           }
         });
       }
@@ -213,13 +217,42 @@ export class FacebookAdsService {
     end_time?: string;
     special_ad_categories?: string[];
   }): Promise<FacebookApiResponse> {
-    const data = {
+    // Build data object with only defined values
+    const data: any = {
       name: campaignData.name,
       objective: campaignData.objective,
       status: campaignData.status || "PAUSED",
-      buying_type: campaignData.buying_type || "AUCTION",
-      ...campaignData
+      buying_type: campaignData.buying_type || "AUCTION"
     };
+
+    // Add optional fields only if they have valid values
+    if (campaignData.bid_strategy) {
+      data.bid_strategy = campaignData.bid_strategy;
+    }
+    
+    if (campaignData.budget_rebalance_flag !== undefined) {
+      data.budget_rebalance_flag = campaignData.budget_rebalance_flag;
+    }
+    
+    if (campaignData.daily_budget && campaignData.daily_budget > 0) {
+      data.daily_budget = campaignData.daily_budget;
+    }
+    
+    if (campaignData.lifetime_budget && campaignData.lifetime_budget > 0) {
+      data.lifetime_budget = campaignData.lifetime_budget;
+    }
+    
+    if (campaignData.start_time) {
+      data.start_time = campaignData.start_time;
+    }
+    
+    if (campaignData.end_time) {
+      data.end_time = campaignData.end_time;
+    }
+    
+    if (campaignData.special_ad_categories && campaignData.special_ad_categories.length > 0) {
+      data.special_ad_categories = campaignData.special_ad_categories;
+    }
 
     return this.makeRequest(`/act_${adAccountId}/campaigns`, "POST", data);
   }
@@ -243,14 +276,44 @@ export class FacebookAdsService {
     promoted_object?: any;
     attribution_spec?: any[];
   }): Promise<FacebookApiResponse> {
-    const data = {
+    // Build data object with only defined values
+    const data: any = {
       name: adSetData.name,
       campaign_id: adSetData.campaign_id,
       optimization_goal: adSetData.optimization_goal,
       billing_event: adSetData.billing_event,
       status: adSetData.status || "PAUSED",
-      ...adSetData
+      targeting: adSetData.targeting
     };
+
+    // Add optional fields only if they have valid values
+    if (adSetData.bid_amount && adSetData.bid_amount > 0) {
+      data.bid_amount = adSetData.bid_amount;
+    }
+    
+    if (adSetData.daily_budget && adSetData.daily_budget > 0) {
+      data.daily_budget = adSetData.daily_budget;
+    }
+    
+    if (adSetData.lifetime_budget && adSetData.lifetime_budget > 0) {
+      data.lifetime_budget = adSetData.lifetime_budget;
+    }
+    
+    if (adSetData.start_time) {
+      data.start_time = adSetData.start_time;
+    }
+    
+    if (adSetData.end_time) {
+      data.end_time = adSetData.end_time;
+    }
+    
+    if (adSetData.promoted_object) {
+      data.promoted_object = adSetData.promoted_object;
+    }
+    
+    if (adSetData.attribution_spec && adSetData.attribution_spec.length > 0) {
+      data.attribution_spec = adSetData.attribution_spec;
+    }
 
     return this.makeRequest(`/act_${adAccountId}/adsets`, "POST", data);
   }
@@ -273,17 +336,72 @@ export class FacebookAdsService {
     page_id?: string;
     instagram_actor_id?: string;
   }): Promise<FacebookApiResponse> {
-    return this.makeRequest(`/act_${adAccountId}/adcreatives`, "POST", creativeData);
+    // Build data object with only defined values
+    const data: any = {
+      name: creativeData.name
+    };
+
+    // Add optional fields only if they have valid values
+    if (creativeData.object_story_spec) {
+      data.object_story_spec = creativeData.object_story_spec;
+    }
+    
+    if (creativeData.image_hash) {
+      data.image_hash = creativeData.image_hash;
+    }
+    
+    if (creativeData.image_url) {
+      data.image_url = creativeData.image_url;
+    }
+    
+    if (creativeData.video_id) {
+      data.video_id = creativeData.video_id;
+    }
+    
+    if (creativeData.body) {
+      data.body = creativeData.body;
+    }
+    
+    if (creativeData.title) {
+      data.title = creativeData.title;
+    }
+    
+    if (creativeData.link_url) {
+      data.link_url = creativeData.link_url;
+    }
+    
+    if (creativeData.call_to_action) {
+      data.call_to_action = creativeData.call_to_action;
+    }
+    
+    if (creativeData.object_id) {
+      data.object_id = creativeData.object_id;
+    }
+    
+    if (creativeData.page_id) {
+      data.page_id = creativeData.page_id;
+    }
+    
+    if (creativeData.instagram_actor_id) {
+      data.instagram_actor_id = creativeData.instagram_actor_id;
+    }
+
+    return this.makeRequest(`/act_${adAccountId}/adcreatives`, "POST", data);
   }
 
   /**
    * Upload image to ad account
    */
   async uploadImage(adAccountId: string, imageUrl: string, filename?: string): Promise<FacebookApiResponse> {
-    return this.makeRequest(`/act_${adAccountId}/adimages`, "POST", {
-      filename: filename || "ad_image.jpg",
+    const data: any = {
       url: imageUrl
-    });
+    };
+    
+    if (filename) {
+      data.filename = filename;
+    }
+    
+    return this.makeRequest(`/act_${adAccountId}/adimages`, "POST", data);
   }
 
   /**
@@ -299,13 +417,18 @@ export class FacebookAdsService {
     status?: string;
     tracking_specs?: any[];
   }): Promise<FacebookApiResponse> {
-    const data = {
+    // Build data object with only defined values
+    const data: any = {
       name: adData.name,
       adset_id: adData.adset_id,
       creative: adData.creative,
-      status: adData.status || "PAUSED",
-      ...adData
+      status: adData.status || "PAUSED"
     };
+
+    // Add optional fields only if they have valid values
+    if (adData.tracking_specs && adData.tracking_specs.length > 0) {
+      data.tracking_specs = adData.tracking_specs;
+    }
 
     return this.makeRequest(`/act_${adAccountId}/ads`, "POST", data);
   }
