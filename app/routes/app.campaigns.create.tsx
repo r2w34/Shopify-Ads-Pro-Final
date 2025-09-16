@@ -31,6 +31,8 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { db } from "../db.server";
 import { FacebookAdsService, CAMPAIGN_OBJECTIVES, OPTIMIZATION_GOALS, BILLING_EVENTS, SPECIAL_AD_CATEGORIES } from "../services/facebook-ads.server";
+import { AudienceSuggestionsService, type AudienceSuggestion } from "../services/audience-suggestions.server";
+import { StoreMediaService, type StoreMedia } from "../services/store-media.server";
 
 // Helper function to map objectives to optimization goals
 const getOptimizationGoal = (objective: string) => {
@@ -144,6 +146,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }))
   );
 
+  // Get store media and audience suggestions
+  const storeMedia = await StoreMediaService.getStoreMedia(request);
+  const storeProducts = await StoreMediaService.getStoreProducts(request);
+  const storeInfo = await StoreMediaService.getStoreInfo(request);
+  
+  // Generate audience suggestions
+  const audienceService = new AudienceSuggestionsService();
+  const audienceSuggestions = await audienceService.getAudienceSuggestions(storeProducts, storeInfo);
+
   return json({
     shop,
     facebookAccount: {
@@ -155,6 +166,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     pages: facebookAccount.pages,
     instagramAccounts,
     products,
+    storeMedia,
+    audienceSuggestions,
+    storeInfo,
   });
 };
 
@@ -306,12 +320,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           billingEvent: getBillingEvent(objective),
           dailyBudget: budgetType === "DAILY" ? Math.round(budget * 100) : undefined, // Convert to cents
           lifetimeBudget: budgetType === "LIFETIME" ? Math.round(budget * 100) : undefined,
-          targeting: {
+          targeting: selectedAudience ? selectedAudience.targeting : {
             geo_locations: {
-              countries: ["US"] // Default targeting - can be enhanced
+              countries: ["US"]
             },
             age_min: 18,
             age_max: 65,
+            genders: [0], // All genders
+            publisher_platforms: ["facebook", "instagram"],
+            facebook_positions: ["feed", "right_hand_column", "instant_article"],
+            instagram_positions: ["stream", "story"],
+            device_platforms: ["mobile", "desktop"]
           },
           
           // Creative level
@@ -377,7 +396,7 @@ export default function CreateCampaign() {
   
   // Multi-stage state
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 6;
   
   // Form state
   const [campaignName, setCampaignName] = useState("");
@@ -404,8 +423,14 @@ export default function CreateCampaign() {
   const [tone, setTone] = useState("professional");
   const [generatedAdCopy, setGeneratedAdCopy] = useState<any>(null);
   
+  // Audience selection state
+  const [selectedAudience, setSelectedAudience] = useState<AudienceSuggestion | null>(null);
+  const [showAudienceModal, setShowAudienceModal] = useState(false);
+  
   // Media and placement state
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
+  const [selectedStoreMedia, setSelectedStoreMedia] = useState<StoreMedia[]>([]);
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [mediaType, setMediaType] = useState("single_image");
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([
     "facebook_feed", "instagram_feed"
@@ -533,8 +558,10 @@ export default function CreateCampaign() {
       case 3:
         return selectedProducts.length > 0;
       case 4:
-        return selectedMedia.length > 0 && selectedPlacements.length > 0;
+        return selectedAudience !== null;
       case 5:
+        return (selectedMedia.length > 0 || selectedStoreMedia.length > 0) && selectedPlacements.length > 0;
+      case 6:
         return targetAudience && tone;
       default:
         return true;
@@ -545,9 +572,10 @@ export default function CreateCampaign() {
     switch (step) {
       case 1: return "Campaign Setup";
       case 2: return "Product Selection";
-      case 3: return "Media & Placements";
-      case 4: return "Audience & Creative";
-      case 5: return "Review & Launch";
+      case 3: return "Target Audience";
+      case 4: return "Media & Placements";
+      case 5: return "Creative Settings";
+      case 6: return "Review & Launch";
       default: return "Campaign Creation";
     }
   };
@@ -699,6 +727,49 @@ export default function CreateCampaign() {
         return (
           <Card>
             <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Target Audience</Text>
+              <Text as="p" variant="bodyMd" tone="subdued">
+                Choose your target audience or let AI suggest the best audiences for your products
+              </Text>
+
+              {selectedAudience && (
+                <Card background="bg-surface-success">
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between">
+                      <Text as="h3" variant="bodyMd" fontWeight="bold">
+                        Selected: {selectedAudience.name}
+                      </Text>
+                      <Badge tone={selectedAudience.aiGenerated ? "info" : "success"}>
+                        {selectedAudience.aiGenerated ? "AI Suggested" : "Template"}
+                      </Badge>
+                    </InlineStack>
+                    <Text as="p" variant="bodySm">
+                      {selectedAudience.description}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Estimated reach: {selectedAudience.estimatedReach}
+                    </Text>
+                  </BlockStack>
+                </Card>
+              )}
+
+              <Button onClick={() => setShowAudienceModal(true)} variant="primary">
+                {selectedAudience ? "Change Audience" : "Select Target Audience"}
+              </Button>
+
+              {!selectedAudience && (
+                <Banner tone="info">
+                  <p>Please select a target audience to continue. We have AI-generated suggestions based on your store products.</p>
+                </Banner>
+              )}
+            </BlockStack>
+          </Card>
+        );
+
+      case 4:
+        return (
+          <Card>
+            <BlockStack gap="400">
               <Text as="h2" variant="headingMd">Media & Placements</Text>
               
               <Select
@@ -709,30 +780,65 @@ export default function CreateCampaign() {
                 helpText="Choose the type of media for your ads"
               />
 
-              <div>
-                <Text as="p" variant="bodyMd" fontWeight="medium">Upload Media Files</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  {mediaType === 'single_image' && 'Upload 1 image (JPG, PNG, max 30MB)'}
-                  {mediaType === 'carousel' && 'Upload 2-10 images for carousel (JPG, PNG, max 30MB each)'}
-                  {mediaType === 'video' && 'Upload 1 video (MP4, MOV, max 4GB)'}
-                  {mediaType === 'collection' && 'Upload 1 cover image + 4-50 product images'}
-                </Text>
-                <input
-                  type="file"
-                  multiple={mediaType === 'carousel' || mediaType === 'collection'}
-                  accept={mediaType === 'video' ? 'video/*' : 'image/*'}
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    setSelectedMedia(files);
-                  }}
-                  style={{ marginTop: '8px' }}
-                />
-                {selectedMedia.length > 0 && (
-                  <Text as="p" variant="bodySm" tone="success">
-                    {selectedMedia.length} file(s) selected
-                  </Text>
+              <BlockStack gap="300">
+                <div>
+                  <Text as="p" variant="bodyMd" fontWeight="medium">Choose Media Source</Text>
+                  <ButtonGroup>
+                    <Button onClick={() => setShowMediaGallery(true)}>
+                      Select from Store Gallery ({data.storeMedia.length} items)
+                    </Button>
+                    <Button variant="plain">Upload New Files</Button>
+                  </ButtonGroup>
+                </div>
+
+                {selectedStoreMedia.length > 0 && (
+                  <Card>
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodyMd" fontWeight="medium">Selected Store Media</Text>
+                      <InlineStack gap="200">
+                        {selectedStoreMedia.slice(0, 3).map((media) => (
+                          <Thumbnail
+                            key={media.id}
+                            source={media.url}
+                            alt={media.alt || 'Store media'}
+                            size="small"
+                          />
+                        ))}
+                        {selectedStoreMedia.length > 3 && (
+                          <Text as="span" variant="bodySm">
+                            +{selectedStoreMedia.length - 3} more
+                          </Text>
+                        )}
+                      </InlineStack>
+                    </BlockStack>
+                  </Card>
                 )}
-              </div>
+
+                <div>
+                  <Text as="p" variant="bodyMd" fontWeight="medium">Or Upload New Files</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {mediaType === 'single_image' && 'Upload 1 image (JPG, PNG, max 30MB)'}
+                    {mediaType === 'carousel' && 'Upload 2-10 images for carousel (JPG, PNG, max 30MB each)'}
+                    {mediaType === 'video' && 'Upload 1 video (MP4, MOV, max 4GB)'}
+                    {mediaType === 'collection' && 'Upload 1 cover image + 4-50 product images'}
+                  </Text>
+                  <input
+                    type="file"
+                    multiple={mediaType === 'carousel' || mediaType === 'collection'}
+                    accept={mediaType === 'video' ? 'video/*' : 'image/*'}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setSelectedMedia(files);
+                    }}
+                    style={{ marginTop: '8px' }}
+                  />
+                  {selectedMedia.length > 0 && (
+                    <Text as="p" variant="bodySm" tone="success">
+                      {selectedMedia.length} file(s) selected
+                    </Text>
+                  )}
+                </div>
+              </BlockStack>
 
               <div>
                 <Text as="p" variant="bodyMd" fontWeight="medium">Ad Placements</Text>
@@ -762,11 +868,11 @@ export default function CreateCampaign() {
           </Card>
         );
 
-      case 4:
+      case 5:
         return (
           <Card>
             <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Audience & Creative Settings</Text>
+              <Text as="h2" variant="headingMd">Creative Settings</Text>
               
               <TextField
                 label="Target Audience"
@@ -804,7 +910,7 @@ export default function CreateCampaign() {
           </Card>
         );
 
-      case 5:
+      case 6:
         return (
           <BlockStack gap="400">
             <Card>
@@ -988,6 +1094,155 @@ export default function CreateCampaign() {
       
       {toastMarkup}
       {errorToastMarkup}
+
+      {/* Audience Selection Modal */}
+      <Modal
+        open={showAudienceModal}
+        onClose={() => setShowAudienceModal(false)}
+        title="Select Target Audience"
+        primaryAction={{
+          content: 'Select Audience',
+          onAction: () => setShowAudienceModal(false),
+          disabled: !selectedAudience
+        }}
+        secondaryActions={[{
+          content: 'Cancel',
+          onAction: () => setShowAudienceModal(false)
+        }]}
+        large
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              Choose from AI-suggested audiences based on your store products, or select from our templates.
+            </Text>
+            
+            <ResourceList
+              resourceName={{ singular: 'audience', plural: 'audiences' }}
+              items={data.audienceSuggestions}
+              renderItem={(audience) => (
+                <ResourceItem
+                  id={audience.id}
+                  onClick={() => setSelectedAudience(audience)}
+                  accessibilityLabel={`Select ${audience.name} audience`}
+                >
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between">
+                      <Text as="h3" variant="bodyMd" fontWeight="bold">
+                        {audience.name}
+                      </Text>
+                      <InlineStack gap="200">
+                        <Badge tone={audience.aiGenerated ? "info" : "success"}>
+                          {audience.aiGenerated ? "AI Suggested" : "Template"}
+                        </Badge>
+                        <Badge tone="attention">
+                          {Math.round(audience.confidence * 100)}% match
+                        </Badge>
+                      </InlineStack>
+                    </InlineStack>
+                    <Text as="p" variant="bodySm">
+                      {audience.description}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Estimated reach: {audience.estimatedReach}
+                    </Text>
+                    <InlineStack gap="100">
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        Age: {audience.targeting.age_min}-{audience.targeting.age_max}
+                      </Text>
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        Countries: {audience.targeting.geo_locations.countries.join(', ')}
+                      </Text>
+                    </InlineStack>
+                  </BlockStack>
+                </ResourceItem>
+              )}
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      {/* Store Media Gallery Modal */}
+      <Modal
+        open={showMediaGallery}
+        onClose={() => setShowMediaGallery(false)}
+        title="Select from Store Gallery"
+        primaryAction={{
+          content: `Select ${selectedStoreMedia.length} item(s)`,
+          onAction: () => setShowMediaGallery(false),
+          disabled: selectedStoreMedia.length === 0
+        }}
+        secondaryActions={[{
+          content: 'Cancel',
+          onAction: () => setShowMediaGallery(false)
+        }]}
+        large
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              Select images and videos from your store to use in your ads.
+            </Text>
+            
+            <ResourceList
+              resourceName={{ singular: 'media', plural: 'media' }}
+              items={data.storeMedia}
+              renderItem={(media) => {
+                const isSelected = selectedStoreMedia.some(m => m.id === media.id);
+                return (
+                  <ResourceItem
+                    id={media.id}
+                    media={
+                      <Thumbnail
+                        source={media.url}
+                        alt={media.alt || 'Store media'}
+                        size="small"
+                      />
+                    }
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedStoreMedia(selectedStoreMedia.filter(m => m.id !== media.id));
+                      } else {
+                        setSelectedStoreMedia([...selectedStoreMedia, media]);
+                      }
+                    }}
+                    accessibilityLabel={`Select ${media.alt || 'media'}`}
+                  >
+                    <InlineStack align="space-between">
+                      <BlockStack gap="100">
+                        <InlineStack gap="200">
+                          <Text as="h3" variant="bodyMd" fontWeight="bold">
+                            {media.alt || `${media.type} file`}
+                          </Text>
+                          {isSelected && <Badge tone="success">Selected</Badge>}
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {media.type.toUpperCase()} • {media.width}x{media.height}
+                        </Text>
+                        {media.productTitle && (
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            From: {media.productTitle}
+                          </Text>
+                        )}
+                      </BlockStack>
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={() => {
+                          if (isSelected) {
+                            setSelectedStoreMedia(selectedStoreMedia.filter(m => m.id !== media.id));
+                          } else {
+                            setSelectedStoreMedia([...selectedStoreMedia, media]);
+                          }
+                        }}
+                      />
+                    </InlineStack>
+                  </ResourceItem>
+                );
+              }}
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </Frame>
   );
 }
