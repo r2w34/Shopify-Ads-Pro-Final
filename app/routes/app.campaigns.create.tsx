@@ -76,6 +76,133 @@ const getBillingEvent = (objective: string) => {
   }
 };
 
+// Intelligent fallback ad copy generation
+const generateIntelligentFallbackAdCopy = (params: {
+  title: string;
+  description: string;
+  price: string;
+  tags: string[];
+  objective: string;
+  targetAudience: string;
+  tone: string;
+}) => {
+  const { title, description, price, tags, objective, targetAudience, tone } = params;
+  
+  // Emotional triggers based on objective
+  const emotionalTriggers = {
+    "OUTCOME_SALES": ["🔥 Limited Time", "💰 Save Big", "⚡ Flash Sale", "🎯 Exclusive Deal"],
+    "OUTCOME_TRAFFIC": ["👀 Discover", "🚀 Explore", "📖 Learn More", "🔍 Find Out"],
+    "OUTCOME_LEADS": ["📧 Get Free", "🎁 Claim Your", "📋 Sign Up", "💡 Get Started"],
+    "OUTCOME_ENGAGEMENT": ["💬 Join the Conversation", "❤️ Love This", "🔄 Share Now", "👥 Connect"],
+    "OUTCOME_AWARENESS": ["🌟 Introducing", "📢 Announcing", "✨ New", "🎉 Meet"],
+    "OUTCOME_APP_PROMOTION": ["📱 Download Now", "🚀 Get the App", "📲 Install Today", "⬇️ Download Free"]
+  };
+
+  // Tone-based language
+  const toneLanguage = {
+    professional: {
+      adjectives: ["premium", "professional", "high-quality", "reliable", "trusted"],
+      phrases: ["industry-leading", "expertly crafted", "proven results", "professional grade"]
+    },
+    casual: {
+      adjectives: ["awesome", "cool", "amazing", "fantastic", "great"],
+      phrases: ["you'll love", "super easy", "totally worth it", "pretty amazing"]
+    },
+    urgent: {
+      adjectives: ["limited", "exclusive", "urgent", "immediate", "instant"],
+      phrases: ["don't wait", "act now", "limited time", "hurry up", "while supplies last"]
+    },
+    friendly: {
+      adjectives: ["friendly", "helpful", "caring", "supportive", "welcoming"],
+      phrases: ["we're here for you", "made with love", "your new favorite", "perfect for you"]
+    }
+  };
+
+  // Get random elements
+  const getRandomElement = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+  
+  const trigger = getRandomElement(emotionalTriggers[objective as keyof typeof emotionalTriggers] || emotionalTriggers["OUTCOME_SALES"]);
+  const toneData = toneLanguage[tone as keyof typeof toneLanguage] || toneLanguage.professional;
+  const adjective = getRandomElement(toneData.adjectives);
+  const phrase = getRandomElement(toneData.phrases);
+
+  // Generate primary text (keep under 125 characters for Facebook)
+  let primaryText = `${trigger} ${title}! `;
+  
+  if (description && description.length > 10) {
+    const remainingChars = 125 - primaryText.length - 30; // Reserve 30 chars for price and CTA
+    const shortDesc = description.length > remainingChars ? description.substring(0, remainingChars - 3) + "..." : description;
+    primaryText += `${shortDesc} `;
+  } else {
+    primaryText += `This ${adjective} product is ${phrase}. `;
+  }
+
+  if (price && parseFloat(price) > 0) {
+    primaryText += `From $${price}. `;
+  }
+
+  // Add urgency based on objective (keep total under 125 chars)
+  const currentLength = primaryText.length;
+  if (currentLength < 100) {
+    if (objective === "OUTCOME_SALES") {
+      primaryText += "Shop now! 🛒";
+    } else if (objective === "OUTCOME_TRAFFIC") {
+      primaryText += "Learn more! 👆";
+    } else if (objective === "OUTCOME_LEADS") {
+      primaryText += "Get free access! 🎁";
+    } else {
+      primaryText += "Don't miss out! ✨";
+    }
+  }
+
+  // Generate headline (keep under 40 characters for Facebook)
+  let headline = title;
+  if (objective === "OUTCOME_SALES" && price && title.length < 25) {
+    headline = `${title} - $${price}`;
+  } else if (objective === "OUTCOME_TRAFFIC" && title.length < 30) {
+    headline = `Discover ${title}`;
+  } else if (objective === "OUTCOME_LEADS" && title.length < 30) {
+    headline = `Free ${title} Guide`;
+  } else if (title.length < 30) {
+    headline = `${adjective.charAt(0).toUpperCase() + adjective.slice(1)} ${title}`;
+  }
+  
+  // Truncate if still too long
+  if (headline.length > 40) {
+    headline = title.length > 40 ? title.substring(0, 37) + "..." : title;
+  }
+
+  // Generate description
+  let descriptionText = "";
+  if (tags && tags.length > 0) {
+    const relevantTags = tags.slice(0, 3).join(" • ");
+    descriptionText = `${relevantTags} | `;
+  }
+  
+  if (price && parseFloat(price) > 0) {
+    descriptionText += `From $${price} | `;
+  }
+  
+  descriptionText += "Quality guaranteed | Fast shipping";
+
+  // Generate CTA based on objective
+  const ctas = {
+    "OUTCOME_SALES": "Shop Now",
+    "OUTCOME_TRAFFIC": "Learn More", 
+    "OUTCOME_LEADS": "Get Free Guide",
+    "OUTCOME_ENGAGEMENT": "Join Now",
+    "OUTCOME_AWARENESS": "Discover More",
+    "OUTCOME_APP_PROMOTION": "Download App"
+  };
+
+  return {
+    primaryText: primaryText.trim(),
+    headline: headline.trim(),
+    description: descriptionText,
+    callToAction: ctas[objective as keyof typeof ctas] || "Shop Now"
+  };
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
@@ -187,42 +314,121 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const tone = formData.get("tone") as string;
 
     try {
-      // Use Gemini AI for content generation
-      const { GeminiService } = await import("../services/gemini.server");
-      const geminiService = new GeminiService();
-
-      // Get product details (simplified for demo)
-      const product = {
-        id: productId,
+      // Get product details
+      const productData = {
+        id: formData.get("productId") as string,
         title: formData.get("productTitle") as string,
         description: formData.get("productDescription") as string,
         price: formData.get("productPrice") as string,
         tags: (formData.get("productTags") as string)?.split(',') || [],
       };
 
-      const adCopy = await geminiService.generateAdCopy({
-        product,
-        objective,
-        targetAudience,
-        tone: tone as any,
-      }, shop);
+      let adCopy = null;
+      let aiService = "none";
 
-      return json({ success: true, adCopy });
+      // Try Gemini AI first
+      try {
+        console.log("🤖 Trying Gemini AI for ad copy generation...");
+        const { geminiService } = await import("../services/gemini.server");
+
+        const audienceData = {
+          age_min: 25,
+          age_max: 55,
+          interests: [targetAudience || "general"],
+          countries: ["US"]
+        };
+
+        const response = await geminiService.generateAdCopy(
+          productData,
+          audienceData,
+          objective || "OUTCOME_SALES"
+        );
+
+        if (response.success) {
+          const parsedResponse = geminiService.parseJSONResponse(response);
+          if (parsedResponse.success && parsedResponse.data) {
+            const adCopyData = parsedResponse.data;
+            adCopy = {
+              primaryText: adCopyData.primaryTexts?.[0] || `✨ ${productData.title} - Amazing product! Don't miss out!`,
+              headline: adCopyData.headlines?.[0] || `${productData.title} - Special Offer`,
+              description: adCopyData.descriptions?.[0] || `Quality guaranteed | Order today!`,
+              callToAction: adCopyData.callToActions?.[0] || 'Shop Now'
+            };
+            aiService = "gemini";
+            console.log("✅ Gemini AI generated ad copy successfully");
+          }
+        } else {
+          throw new Error(response.error || "Gemini API failed");
+        }
+      } catch (geminiError) {
+        console.log("⚠️ Gemini AI failed:", geminiError.message);
+        
+        // Try OpenAI as fallback
+        try {
+          console.log("🤖 Trying OpenAI as fallback...");
+          const { OpenAIService } = await import("../services/openai.server");
+          const openaiService = new OpenAIService();
+
+          const adCopyRequest = {
+            product: productData,
+            objective: objective || "OUTCOME_SALES",
+            targetAudience: targetAudience || "general audience",
+            tone: (tone as any) || "professional"
+          };
+
+          const openaiResponse = await openaiService.generateAdCopy(adCopyRequest, shop);
+          
+          adCopy = {
+            primaryText: openaiResponse.primaryText?.[0] || `✨ ${productData.title} - Amazing product! Don't miss out!`,
+            headline: openaiResponse.headlines?.[0] || `${productData.title} - Special Offer`,
+            description: openaiResponse.descriptions?.[0] || `Quality guaranteed | Order today!`,
+            callToAction: openaiResponse.callToActions?.[0] || 'Shop Now'
+          };
+          aiService = "openai";
+          console.log("✅ OpenAI generated ad copy successfully");
+        } catch (openaiError) {
+          console.log("⚠️ OpenAI also failed:", openaiError.message);
+          throw new Error("Both AI services failed");
+        }
+      }
+
+      if (adCopy) {
+        return json({ 
+          success: true, 
+          adCopy, 
+          aiService,
+          message: `Ad copy generated using ${aiService.toUpperCase()} AI`
+        });
+      }
+
+      throw new Error("Failed to generate ad copy with any AI service");
+
     } catch (error: any) {
       console.error("Ad copy generation error:", error);
+      console.log("🔄 Using intelligent fallback ad copy generation...");
       
-      // Simple fallback ad copy on error
-      const fallbackAdCopy = {
-        primaryText: `✨ ${product.title} - ${targetAudience ? `Perfect for ${targetAudience.toLowerCase()}` : 'Amazing product'}! ${product.description ? product.description.substring(0, 80) + '...' : 'High quality and great value.'} Don't miss out!`,
-        headline: `${product.title} - Special Offer`,
-        description: `${product.price ? `From ${product.price}` : 'Great prices'} | Quality guaranteed | Order today!`,
-        callToAction: 'Shop Now'
-      };
+      // Get product data for fallback
+      const productTitle = formData.get("productTitle") as string;
+      const productDescription = formData.get("productDescription") as string;
+      const productPrice = formData.get("productPrice") as string;
+      const productTags = (formData.get("productTags") as string)?.split(',') || [];
       
+      // Intelligent fallback ad copy generation
+      const fallbackAdCopy = generateIntelligentFallbackAdCopy({
+        title: productTitle,
+        description: productDescription,
+        price: productPrice,
+        tags: productTags,
+        objective: objective || "OUTCOME_SALES",
+        targetAudience: targetAudience || "general audience",
+        tone: tone || "professional"
+      });
+
       return json({ 
         success: true, 
-        adCopy: fallbackAdCopy,
-        message: "Using fallback ad copy (AI service error)" 
+        adCopy: fallbackAdCopy, 
+        aiService: "fallback",
+        message: "Generated using intelligent template system (AI services unavailable)"
       });
     }
   }
@@ -426,6 +632,7 @@ export default function CreateCampaign() {
   const [targetAudience, setTargetAudience] = useState("");
   const [tone, setTone] = useState("professional");
   const [generatedAdCopy, setGeneratedAdCopy] = useState<any>(null);
+  const [aiServiceUsed, setAiServiceUsed] = useState<string>("");
   
   // Audience selection state
   const [selectedAudience, setSelectedAudience] = useState<AudienceSuggestion | null>(null);
@@ -458,7 +665,14 @@ export default function CreateCampaign() {
   useEffect(() => {
     if (fetcher.data?.success && fetcher.data?.adCopy) {
       setGeneratedAdCopy(fetcher.data.adCopy);
+      setAiServiceUsed(fetcher.data.aiService || "unknown");
       setCurrentStep(4); // Move to review step
+      
+      // Show success message with AI service info
+      if (fetcher.data.message) {
+        setToastMessage(fetcher.data.message);
+        setShowSuccessToast(true);
+      }
     }
     
     if (fetcher.data?.success && fetcher.data?.campaignId) {
@@ -1293,7 +1507,17 @@ export default function CreateCampaign() {
             {generatedAdCopy && (
               <Card>
                 <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">Generated Ad Copy</Text>
+                  <InlineStack gap="200" align="space-between">
+                    <Text as="h2" variant="headingMd">Generated Ad Copy</Text>
+                    {aiServiceUsed && (
+                      <Badge tone={aiServiceUsed === 'gemini' ? 'success' : aiServiceUsed === 'openai' ? 'info' : 'attention'}>
+                        {aiServiceUsed === 'gemini' ? '🤖 Gemini AI' : 
+                         aiServiceUsed === 'openai' ? '🧠 OpenAI' : 
+                         aiServiceUsed === 'fallback' ? '⚡ Smart Template' : 
+                         '🔧 Generated'}
+                      </Badge>
+                    )}
+                  </InlineStack>
                   <BlockStack gap="200">
                     <Text as="h3" variant="bodyMd" fontWeight="bold">Primary Text:</Text>
                     <Text as="p" variant="bodyMd">{generatedAdCopy.primaryText}</Text>
