@@ -5,7 +5,7 @@
  * Tests all critical Facebook API endpoints with the new access token
  */
 
-const axios = require('axios');
+import axios from 'axios';
 
 const ACCESS_TOKEN = 'EAAE3VR41gpMBPUnhVx3IE02XCunPLB5n6CJNdSW6AFsoZCUOKjHsYrLzdyiMWlcq3H2ZBYYe8KstYoU7aCluNGl2lBWSegHaRzonWvCmfCV3v5ZAPcPnqAW3TqReDR7mUVnUuqBwOdTfGx2apFPFX33fvpGZB5a8PDWs329qaA9wWNQjUP3VYBEydGERq3JIMshMg7qA';
 const API_VERSION = 'v23.0';
