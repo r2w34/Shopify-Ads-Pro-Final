@@ -1,6 +1,6 @@
 import axios from "axios";
 import { db } from "../db.server";
-import { OpenAIService } from "./openai.server";
+import { GeminiService } from "./gemini.server";
 
 export interface CompetitorAd {
   id: string;
@@ -48,11 +48,11 @@ export interface AdInsights {
 }
 
 export class CompetitiveIntelligenceService {
-  private openaiService: OpenAIService;
+  private geminiService: GeminiService;
   private facebookAccessToken: string;
 
   constructor() {
-    this.openaiService = new OpenAIService();
+    this.geminiService = new GeminiService();
     this.facebookAccessToken = process.env.FACEBOOK_ACCESS_TOKEN || '';
   }
 
@@ -250,7 +250,7 @@ export class CompetitiveIntelligenceService {
     `;
 
     try {
-      const insights = await this.openaiService.generateAudienceInsights(userProduct, 'competitive-analysis');
+      const insights = await this.geminiService.generateAudienceInsights(userProduct, 'competitive-analysis');
       
       // Combine AI insights with competitor analysis
       return {

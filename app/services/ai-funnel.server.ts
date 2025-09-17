@@ -1,12 +1,12 @@
 import { db } from "../db.server";
-import { OpenAIService } from "./openai.server";
+import { GeminiService } from "./gemini.server";
 import { FacebookAdsService } from "./facebook.server";
 import { MachineLearningService } from "./machine-learning.server";
 import axios from "axios";
 
 // Gemini API configuration
-const GEMINI_API_KEY = "AIzaSyCOLsr0_ADY0Lsgs1Vl9TZattNpLBwyGlQ";
-const GEMINI_TEXT_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
+const GEMINI_API_KEY = "AIzaSyDSCsILpx3Glg4wtZq0o7U2NImP2JM9kn4";
+const GEMINI_TEXT_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 export interface FunnelStage {
   name: string;
@@ -56,11 +56,11 @@ export interface FunnelPerformance {
 }
 
 export class AIFunnelService {
-  private openaiService: OpenAIService;
+  private geminiService: GeminiService;
   private mlService: MachineLearningService;
 
   constructor() {
-    this.openaiService = new OpenAIService();
+    this.geminiService = new GeminiService();
     this.mlService = new MachineLearningService();
   }
 

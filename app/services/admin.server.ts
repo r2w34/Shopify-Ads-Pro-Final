@@ -379,7 +379,7 @@ export class AdminService {
   static async initializeDefaultSettings() {
     const defaultSettings = [
       // API Settings
-      { key: 'openai_api_key', value: '', description: 'OpenAI API Key for AI features', category: 'api', isEncrypted: true },
+      { key: 'gemini_api_key', value: '', description: 'Gemini AI API Key for AI features', category: 'api', isEncrypted: true },
       { key: 'facebook_app_id', value: '', description: 'Facebook App ID', category: 'api' },
       { key: 'facebook_app_secret', value: '', description: 'Facebook App Secret', category: 'api', isEncrypted: true },
       
