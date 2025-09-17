@@ -1,0 +1,62 @@
+{
+  "passed": 0,
+  "failed": 4,
+  "total": 4,
+  "details": [
+    {
+      "name": "7-Step Campaign Creation",
+      "path": "/app/campaigns/create",
+      "statusCode": 410,
+      "passed": false,
+      "foundFeatures": [],
+      "missingFeatures": [
+        "currentStep",
+        "totalSteps",
+        "Campaign Setup",
+        "Product Selection",
+        "Target Audience",
+        "Media & Placements",
+        "Creative Settings",
+        "Ad Preview",
+        "Review & Launch"
+      ]
+    },
+    {
+      "name": "Facebook Ads Library Integration",
+      "path": "/app/ads-library",
+      "statusCode": 410,
+      "passed": false,
+      "foundFeatures": [],
+      "missingFeatures": [
+        "Ad Inspiration",
+        "Competitive Intelligence",
+        "Search Ads",
+        "Copy Ad Text"
+      ]
+    },
+    {
+      "name": "AI Dashboard",
+      "path": "/app/ai-dashboard",
+      "statusCode": 410,
+      "passed": false,
+      "foundFeatures": [],
+      "missingFeatures": [
+        "AI Analytics",
+        "Performance Insights",
+        "Optimization Recommendations"
+      ]
+    },
+    {
+      "name": "Enhanced Analytics",
+      "path": "/app/analytics",
+      "statusCode": 410,
+      "passed": false,
+      "foundFeatures": [],
+      "missingFeatures": [
+        "Advanced Metrics",
+        "TensorFlow",
+        "Machine Learning"
+      ]
+    }
+  ]
+}
