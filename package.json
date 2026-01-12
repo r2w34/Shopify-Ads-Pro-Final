@@ -51,7 +51,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "express-rate-limit": "^8.1.0",
-    "fabric": "^6.7.1",
+    "fabric": "^7.0.0",
     "facebook-nodejs-business-sdk": "^20.0.3",
     "ffmpeg-static": "^5.2.0",
     "helmet": "^8.1.0",
